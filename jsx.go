@@ -153,17 +153,6 @@ func (h hyperNode) String() string {
 
 	var builder strings.Builder
 
-	if h.tag == "cdata" {
-		builder.WriteString("<![CDATA[")
-
-		for _, child := range h.children {
-			builder.WriteString(child.String())
-		}
-
-		builder.WriteString("]]>")
-		return builder.String()
-	}
-
 	if h.tag != "<>" {
 		builder.WriteString("<" + h.tag)
 
