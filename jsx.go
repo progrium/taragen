@@ -10,25 +10,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-type JSXFormat struct{}
-
-func (f *JSXFormat) Parse(p *Page) (out []byte, data Data, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("panic on page:", p.path)
-			switch panicErr := r.(type) {
-			case error:
-				err = panicErr
-			default:
-				err = fmt.Errorf("%v", panicErr)
-			}
-		}
-	}()
-	out, err = RenderJSX(p.Source(), p.jsxGlobals())
-	return
-}
-
-func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) {
+func setupJSX(src []byte) (*goja.Runtime, string, error) {
 	transform := api.Transform(string(src), api.TransformOptions{
 		Loader:         api.LoaderJSX,
 		JSXFactory:     "hyper",
@@ -36,17 +18,24 @@ func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) 
 		JSXSideEffects: true,
 	})
 	if len(transform.Errors) > 0 {
-		return nil, fmt.Errorf("error parsing module: %s", transform.Errors[0].Text)
+		return nil, "", fmt.Errorf("error parsing JSX: %s", transform.Errors[0].Text)
 	}
 
 	vm := goja.New()
-	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
-
 	if err := vm.Set("hyper", hyper); err != nil {
+		return nil, "", err
+	}
+
+	return vm, string(transform.Code), nil
+}
+
+func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) {
+	vm, jsCode, err := setupJSX(src)
+	if err != nil {
 		return nil, err
 	}
 
-	// if there is a page global, we need to update it with a data function
+	// if there is a page global, we need to allow updating it with a data function
 	page, ok := globals["page"].(Data)
 	if ok {
 		if err := vm.Set("data", func(call goja.FunctionCall) goja.Value {
@@ -68,7 +57,7 @@ func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) 
 		}
 	}
 
-	v, err := vm.RunString(string(transform.Code))
+	v, err := vm.RunString(jsCode)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +74,7 @@ func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) 
 		}
 	}
 
-	var node HyperNode
+	var node hyperNode
 	err = vm.ExportTo(v, &node)
 	if err != nil {
 		return nil, err
@@ -94,19 +83,8 @@ func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) 
 }
 
 func ExportJSX(src []byte, globals map[string]any) (map[string]any, error) {
-	transform := api.Transform(string(src), api.TransformOptions{
-		Loader:         api.LoaderJSX,
-		JSXFactory:     "hyper",
-		JSXFragment:    "'<>'",
-		JSXSideEffects: true,
-	})
-	if len(transform.Errors) > 0 {
-		return nil, fmt.Errorf("error parsing module: %s", transform.Errors[0].Text)
-	}
-
-	vm := goja.New()
-
-	if err := vm.Set("hyper", hyper); err != nil {
+	vm, jsCode, err := setupJSX(src)
+	if err != nil {
 		return nil, err
 	}
 
@@ -119,7 +97,7 @@ func ExportJSX(src []byte, globals map[string]any) (map[string]any, error) {
 		}
 	}
 
-	_, err := vm.RunString(string(transform.Code))
+	_, err = vm.RunString(jsCode)
 	if err != nil {
 		return nil, err
 	}
@@ -133,32 +111,52 @@ func ExportJSX(src []byte, globals map[string]any) (map[string]any, error) {
 	return out, nil
 }
 
-type HyperNode struct {
-	Tag      string
-	Attrs    map[string]string
-	Children []HyperNode
-	Text     string
+func hyper(tag string, attrs map[string]string, children ...any) hyperNode {
+	var nodes []hyperNode
+	for _, child := range children {
+		if child == nil {
+			continue
+		}
+		switch c := child.(type) {
+		case []any:
+			nodes = append(nodes, hyper("", nil, c...).children...)
+		case hyperNode:
+			nodes = append(nodes, c)
+		case string:
+			nodes = append(nodes, hyperNode{text: c})
+		default:
+			log.Panicf("unsupported child type: %T (in %s)", child, tag)
+		}
+	}
+	return hyperNode{tag: tag, attrs: attrs, children: nodes}
 }
 
-func (h HyperNode) isSelfClosing() bool {
-	return len(h.Children) == 0 && !slices.Contains([]string{
+type hyperNode struct {
+	tag      string
+	attrs    map[string]string
+	children []hyperNode
+	text     string
+}
+
+func (h hyperNode) isSelfClosing() bool {
+	return len(h.children) == 0 && !slices.Contains([]string{
 		"script",
 		"link",
 		"iframe",
-	}, h.Tag)
+	}, h.tag)
 }
 
-func (h HyperNode) String() string {
-	if h.Text != "" {
-		return h.Text
+func (h hyperNode) String() string {
+	if h.text != "" {
+		return h.text
 	}
 
 	var builder strings.Builder
 
-	if h.Tag == "cdata" {
+	if h.tag == "cdata" {
 		builder.WriteString("<![CDATA[")
 
-		for _, child := range h.Children {
+		for _, child := range h.children {
 			builder.WriteString(child.String())
 		}
 
@@ -166,60 +164,33 @@ func (h HyperNode) String() string {
 		return builder.String()
 	}
 
-	if h.Tag != "<>" {
-		if h.Tag == "xml" {
-			builder.WriteString("<?" + h.Tag)
-		} else {
-			builder.WriteString("<" + h.Tag)
-		}
+	if h.tag != "<>" {
+		builder.WriteString("<" + h.tag)
 
-		if len(h.Attrs) > 0 {
+		if len(h.attrs) > 0 {
 			builder.WriteString(" ")
 			var i int
-			for k, v := range h.Attrs {
+			for k, v := range h.attrs {
 				i++
 				builder.WriteString(k + "=\"" + v + "\"")
-				if i < len(h.Attrs) {
+				if i < len(h.attrs) {
 					builder.WriteString(" ")
 				}
 			}
 		}
 
-		if h.Tag == "xml" {
-			builder.WriteString("?")
-		} else if h.isSelfClosing() {
+		if h.isSelfClosing() {
 			builder.WriteString("/")
 		}
 		builder.WriteString(">")
 	}
 
-	for _, child := range h.Children {
+	for _, child := range h.children {
 		builder.WriteString(child.String())
 	}
 
-	if !h.isSelfClosing() && h.Tag != "<>" && h.Tag != "xml" {
-		builder.WriteString("</" + h.Tag + ">")
+	if !h.isSelfClosing() && h.tag != "<>" {
+		builder.WriteString("</" + h.tag + ">")
 	}
 	return builder.String()
-}
-
-func hyper(tag string, attrs map[string]string, children ...any) HyperNode {
-	var nodes []HyperNode
-	for _, child := range children {
-		if child == nil {
-			continue
-		}
-		switch c := child.(type) {
-		case []any:
-			nodes = append(nodes, hyper("", nil, c...).Children...)
-		case HyperNode:
-			nodes = append(nodes, c)
-		case string:
-			nodes = append(nodes, HyperNode{Text: c})
-		default:
-			// nodes = append(nodes, HyperNode{Text: " "})
-			log.Panicf("unsupported child type: %T (in %s)", child, tag)
-		}
-	}
-	return HyperNode{Tag: tag, Attrs: attrs, Children: nodes}
 }

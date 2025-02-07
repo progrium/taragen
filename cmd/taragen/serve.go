@@ -21,9 +21,8 @@ func serveCmd() *cli.Command {
 
 			fmt.Println("serving on http://localhost:8088 ...")
 
-			go taragen.WatchForReloads(wd)
-
 			site := taragen.NewSite(wd)
+			site.WatchForReloads()
 
 			if err := site.ParseAll(); err != nil {
 				fatal(err)

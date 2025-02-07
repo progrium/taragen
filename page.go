@@ -2,7 +2,6 @@ package taragen
 
 import (
 	"fmt"
-	"html/template"
 	"io"
 	"os"
 	"path"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/yosssi/gohtml"
 )
 
@@ -19,7 +17,6 @@ type Data map[string]any
 
 const (
 	Layout = "layout"
-
 	Slug   = "slug"
 	Path   = "path"
 	Source = "src"
@@ -29,11 +26,10 @@ const (
 )
 
 type Page struct {
-	path string // normalized path to the page (ex: path/to/page)
-	data Data
-	site *Site
-
-	defaultGlobals map[string]any
+	path    string // normalized path to the page (ex: path/to/page)
+	data    Data
+	site    *Site
+	globals map[string]any
 }
 
 func sortPages(pages []*Page) {
@@ -93,78 +89,7 @@ func (p *Page) Subpages() (subpages []*Page) {
 	return subpages
 }
 
-func (p *Page) templateFuncs() template.FuncMap {
-	return template.FuncMap{
-		"content": func() template.HTML {
-			return template.HTML(string(p.Body()))
-		},
-		"page": func(key string) string {
-			return p.data[key].(string)
-		},
-		"partial": func(name string, args ...any) (template.HTML, error) {
-			b, err := p.site.Partial(name, p.jsxGlobals(), args...)
-			if err != nil {
-				return "", err
-			}
-			return template.HTML(b), nil
-		},
-	}
-}
-
-func (p *Page) jsxGlobals() map[string]any {
-	g := make(map[string]any)
-	// TODO: load site globals
-	for k, v := range p.defaultGlobals {
-		g[k] = v
-	}
-	g["page"] = p.data
-	g["partial"] = func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
-		name := call.Argument(0).String()
-		var args []any
-		for _, arg := range call.Arguments[1:] {
-			args = append(args, arg.Export())
-		}
-		partial, err := p.site.Partial(name, p.jsxGlobals(), args...)
-		if err != nil {
-			return runtime.ToValue(err.Error())
-		}
-		return runtime.ToValue(string(partial))
-	}
-	g["pages"] = func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
-		// Helper function to build page data with recursive subpages
-		var buildPageData func(*Page) map[string]any
-		buildPageData = func(page *Page) map[string]any {
-			pageData := make(map[string]any)
-			// Copy all page data
-			for k, v := range page.data {
-				pageData[k] = v
-			}
-
-			// Get subpages
-			var subpagesData []map[string]any
-			for _, subpage := range page.Subpages() {
-				if subpage != page { // Avoid self-reference
-					subpagesData = append(subpagesData, buildPageData(subpage))
-				}
-			}
-			pageData["subpages"] = subpagesData
-
-			return pageData
-		}
-
-		// Convert pages to the new structure
-		pages := p.site.Pages(call.Argument(0).String())
-		result := make([]map[string]any, len(pages))
-		for i, page := range pages {
-			result[i] = buildPageData(page)
-		}
-
-		return runtime.ToValue(result)
-	}
-	return g
-}
-
-func (p *Page) loadGlobalsDefaults() error {
+func (p *Page) loadGlobals() error {
 	globals := make(map[string]any)
 
 	// find all _globals.jsx files in parent directories
@@ -197,19 +122,23 @@ func (p *Page) loadGlobalsDefaults() error {
 			globals[k] = v
 		}
 	}
-	p.defaultGlobals = globals
+
+	// load built-in globals
+	for k, v := range builtinGlobals(p) {
+		globals[k] = v
+	}
+
+	p.globals = globals
 	return nil
 }
 
-func (p *Page) loadDataDefaults() error {
-	// TODO: load site defaults
-
-	// find all _data.jsx files in parent directories
+func (p *Page) loadDefaults() error {
+	// find all _defaults.jsx files in parent directories
 	var dataFiles []string
 	dir := filepath.Dir(p.path)
 	stop := false
 	for {
-		dataPath := path.Join(dir, "_data"+ExtJSX)
+		dataPath := path.Join(dir, "_defaults"+ExtJSX)
 		if _, err := os.Stat(path.Join(p.site.dir, dataPath)); err == nil {
 			dataFiles = append([]string{dataPath}, dataFiles...)
 		}
@@ -226,7 +155,7 @@ func (p *Page) loadDataDefaults() error {
 		if err != nil {
 			return err
 		}
-		data, err := ExportJSX(dataSrc, p.jsxGlobals())
+		data, err := ExportJSX(dataSrc, p.globals)
 		if err != nil {
 			return err
 		}
@@ -243,7 +172,7 @@ func (p *Page) Parse() error {
 	var err error
 
 	var suffixes []string
-	for ext := range formats {
+	for ext := range Formats {
 		suffixes = append(suffixes, ext)
 		suffixes = append(suffixes, "/index"+ext)
 	}
@@ -265,16 +194,16 @@ func (p *Page) Parse() error {
 		return fmt.Errorf("unable to find page source for: %s", p.path)
 	}
 
-	if err := p.loadGlobalsDefaults(); err != nil {
+	if err := p.loadGlobals(); err != nil {
 		return err
 	}
-	if err := p.loadDataDefaults(); err != nil {
+	if err := p.loadDefaults(); err != nil {
 		return err
 	}
 
 	p.data[Source] = string(src)
 
-	f, ok := formats[format]
+	f, ok := Formats[format]
 	if !ok {
 		return fmt.Errorf("unknown page format: %s", format)
 	}
@@ -337,7 +266,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 			isJSX = false
 		}
 		if isJSX {
-			out, err = RenderJSX(layoutSrc, p.jsxGlobals(), string(out))
+			out, err = RenderJSX(layoutSrc, p.globals, string(out))
 			if err != nil {
 				return err
 			}
@@ -349,11 +278,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 			for k, v := range data {
 				p.data[k] = v
 			}
-			funcs := p.templateFuncs()
-			funcs["content"] = func() template.HTML {
-				return template.HTML(string(out))
-			}
-			out, err = RenderTemplate(layoutPath, rest, funcs)
+			out, err = RenderTemplate(layoutPath, rest, builtinFuncs(p, out))
 			if err != nil {
 				return err
 			}
@@ -369,11 +294,6 @@ func (p *Page) Render(w io.Writer) (err error) {
 			defaultLayouts = nil
 		}
 	}
-	_, err = w.Write(formatTags(out))
+	_, err = w.Write(gohtml.FormatBytes(out))
 	return
-}
-
-func formatTags(input []byte) []byte {
-	formatted := gohtml.Format(string(input))
-	return []byte(formatted)
 }

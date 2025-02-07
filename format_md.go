@@ -8,10 +8,10 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 )
 
-type MarkdownFormat struct{}
+type MarkdownParser struct{}
 
-func (f *MarkdownFormat) Parse(p *Page) ([]byte, Data, error) {
-	src, data, err := new(TemplateFormat).Parse(p)
+func (f *MarkdownParser) Parse(p *Page) ([]byte, Data, error) {
+	src, data, err := new(TemplateParser).Parse(p)
 	if err != nil {
 		return nil, nil, err
 	}

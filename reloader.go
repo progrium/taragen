@@ -16,7 +16,7 @@ import (
 
 var reloaders sync.Map
 
-func WatchForReloads(dir string) {
+func watchForReloads(dir string) {
 	wfs := watchfs.New(os.DirFS("/").(fs.StatFS))
 	w, err := wfs.Watch(strings.TrimPrefix(dir, "/"), &watchfs.Config{
 		Recursive: true,

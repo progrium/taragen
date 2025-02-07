@@ -13,13 +13,13 @@ const (
 	ExtJSX      = ".jsx"
 )
 
-var formats = map[string]PageFormat{
-	ExtMarkdown: &MarkdownFormat{},
-	ExtTemplate: &TemplateFormat{},
-	ExtJSX:      &JSXFormat{},
+var Formats = map[string]PageParser{
+	ExtMarkdown: &MarkdownParser{},
+	ExtTemplate: &TemplateParser{},
+	ExtJSX:      &JSXParser{},
 }
 
-type PageFormat interface {
+type PageParser interface {
 	Parse(p *Page) ([]byte, Data, error)
 }
 

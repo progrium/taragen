@@ -24,6 +24,10 @@ func NewSite(dir string) *Site {
 	}
 }
 
+func (s *Site) WatchForReloads() {
+	go watchForReloads(s.dir)
+}
+
 func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 	if err = s.ParseAll(); err != nil {
 		return
@@ -75,6 +79,10 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 	return nil
 }
 
+func (s *Site) Pages(name string) []*Page {
+	return s.Page(name).Subpages()
+}
+
 func (s *Site) Page(normalPath string) *Page {
 	normalPath = strings.TrimPrefix(normalPath, "/")
 	if _, ok := s.pages[normalPath]; !ok {
@@ -116,10 +124,6 @@ func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte
 	return RenderTemplate(name, partialSrc, nil)
 }
 
-func (s *Site) Pages(name string) []*Page {
-	return s.Page(name).Subpages()
-}
-
 func (s *Site) ParseAll() error {
 	return filepath.Walk(s.dir, func(curPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -139,7 +143,7 @@ func (s *Site) ParseAll() error {
 		}
 		if !info.IsDir() {
 			found := false
-			for key := range formats {
+			for key := range Formats {
 				if strings.HasSuffix(info.Name(), key) {
 					found = true
 				}
