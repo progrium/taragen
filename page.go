@@ -16,13 +16,14 @@ import (
 type Data map[string]any
 
 const (
-	Layout = "layout"
-	Slug   = "slug"
-	Path   = "path"
-	Source = "src"
-	Body   = "body"
-	IsDir  = "isDir"
-	Date   = "date"
+	Layout      = "layout"
+	Slug        = "slug"
+	Path        = "path"
+	Source      = "src"
+	Body        = "body"
+	IsDir       = "isDir"
+	Date        = "date"
+	ContentType = "contentType"
 )
 
 type Page struct {
@@ -47,32 +48,35 @@ func sortPages(pages []*Page) {
 	})
 }
 
-func getData[T any](data Data, key string) T {
-	var empty T
+func getData[T any](data Data, key string, fallback T) T {
 	if data[key] == nil {
-		return empty
+		return fallback
 	}
 	return data[key].(T)
 }
 
 func (p *Page) Body() []byte {
-	return []byte(getData[string](p.data, Body))
+	return []byte(getData[string](p.data, Body, ""))
 }
 
 func (p *Page) Source() []byte {
-	return []byte(getData[string](p.data, Source))
+	return []byte(getData[string](p.data, Source, ""))
 }
 
 func (p *Page) IsDir() bool {
-	return getData[bool](p.data, IsDir)
+	return getData[bool](p.data, IsDir, false)
 }
 
 func (p *Page) Date() string {
-	return getData[string](p.data, Date)
+	return getData[string](p.data, Date, "")
 }
 
 func (p *Page) Slug() string {
-	return getData[string](p.data, Slug)
+	return getData[string](p.data, Slug, "")
+}
+
+func (p *Page) ContentType() string {
+	return getData[string](p.data, ContentType, "text/html")
 }
 
 func (p *Page) Subpages() (subpages []*Page) {
@@ -294,6 +298,9 @@ func (p *Page) Render(w io.Writer) (err error) {
 			defaultLayouts = nil
 		}
 	}
-	_, err = w.Write(gohtml.FormatBytes(out))
+	if p.ContentType() == "text/html" {
+		out = gohtml.FormatBytes(out)
+	}
+	_, err = w.Write(out)
 	return
 }

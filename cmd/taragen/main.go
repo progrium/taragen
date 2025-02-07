@@ -18,6 +18,7 @@ type Main struct{}
 func (m *Main) InitializeCLI(root *cli.Command) {
 	root.Usage = "taragen"
 	root.Version = Version
+
 	root.AddCommand(serveCmd())
 	root.AddCommand(generateCmd())
 }

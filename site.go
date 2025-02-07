@@ -61,8 +61,13 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 		if page.IsDir() {
 			continue
 		}
+		var targetPath string
+		if filepath.Ext(page.path) == "" || page.path == "." {
+			targetPath = path.Join(dest, page.path, "index.html")
+		} else {
+			targetPath = path.Join(dest, page.path)
+		}
 		fmt.Println(page.path)
-		targetPath := path.Join(dest, page.path, "index.html")
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 			return err
 		}
@@ -180,14 +185,15 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		normalPath = "."
 	}
 	if s.IsPage(normalPath) {
-		w.Header().Set("Content-Type", "text/html")
 		var buf bytes.Buffer
-		err := s.Page(normalPath).Render(&buf)
+		page := s.Page(normalPath)
+		err := page.Render(&buf)
 		if err != nil {
 			log.Println(normalPath, ":", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.Header().Set("Content-Type", page.ContentType())
 		injectLiveReload(w, buf)
 		return
 	}

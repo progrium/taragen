@@ -9,6 +9,9 @@ type TemplateParser struct{}
 
 func builtinFuncs(p *Page, content []byte) template.FuncMap {
 	return template.FuncMap{
+		"safeHTML": func(s string) template.HTML {
+			return template.HTML(s)
+		},
 		"content": func() template.HTML {
 			return template.HTML(string(content))
 		},
