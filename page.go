@@ -81,7 +81,7 @@ func (p *Page) ContentType() string {
 
 func (p *Page) Subpages() (subpages []*Page) {
 	for _, page := range p.site.pages {
-		if strings.HasPrefix(page.path, p.path+"/") {
+		if strings.HasPrefix(page.path, p.path+"/") || p.path == "." {
 			relPath := strings.TrimPrefix(page.path, p.path+"/")
 			if strings.Contains(relPath, "/") {
 				continue
@@ -229,27 +229,37 @@ func (p *Page) Render(w io.Writer) (err error) {
 		return
 	}
 
+	origLayout := p.data[Layout]
+	defer func() {
+		p.data[Layout] = origLayout
+	}()
+
 	// Find all layout files in parent directories
 	defaultLayouts := []string{}
-	dir := filepath.Dir(p.path)
-	for dir != "." && dir != "/" {
-		// Check for JSX layout
-		jsxLayoutPath := path.Join(dir, "_layout"+ExtJSX)
-		if _, err := os.Stat(path.Join(p.site.dir, jsxLayoutPath)); err == nil {
-			defaultLayouts = append(defaultLayouts, strings.TrimSuffix(jsxLayoutPath, ExtJSX))
-		}
-		// Check for Template layout
-		tplLayoutPath := path.Join(dir, "_layout"+ExtTemplate)
-		if _, err := os.Stat(path.Join(p.site.dir, tplLayoutPath)); err == nil {
-			defaultLayouts = append(defaultLayouts, strings.TrimSuffix(tplLayoutPath, ExtTemplate))
+	if origLayout == nil {
+		dir := filepath.Dir(p.path)
+		for {
+			// Check for JSX layout
+			jsxLayoutPath := path.Join(dir, "_layout"+ExtJSX)
+			if _, err := os.Stat(path.Join(p.site.dir, jsxLayoutPath)); err == nil {
+				defaultLayouts = append(defaultLayouts, strings.TrimSuffix(jsxLayoutPath, ExtJSX))
+			}
+			// Check for Template layout
+			tplLayoutPath := path.Join(dir, "_layout"+ExtTemplate)
+			if _, err := os.Stat(path.Join(p.site.dir, tplLayoutPath)); err == nil {
+				defaultLayouts = append(defaultLayouts, strings.TrimSuffix(tplLayoutPath, ExtTemplate))
+			}
+
+			if dir == "." || dir == "/" {
+				break
+			}
+			dir = filepath.Dir(dir)
 		}
 
-		dir = filepath.Dir(dir)
-	}
-
-	if len(defaultLayouts) > 0 && p.data[Layout] == nil {
-		p.data[Layout] = defaultLayouts[0]
-		defaultLayouts = defaultLayouts[1:]
+		if len(defaultLayouts) > 0 && p.data[Layout] == nil {
+			p.data[Layout] = defaultLayouts[0]
+			defaultLayouts = defaultLayouts[1:]
+		}
 	}
 
 	out := p.Body()
@@ -287,6 +297,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 				return err
 			}
 		}
+
 		if p.data[Layout].(string) == layout {
 			if len(defaultLayouts) > 0 {
 				p.data[Layout] = defaultLayouts[0]

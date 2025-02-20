@@ -134,7 +134,7 @@ func (s *Site) ParseAll() error {
 		if err != nil {
 			return err
 		}
-		if strings.HasPrefix(info.Name(), ".") {
+		if strings.HasPrefix(info.Name(), ".") && info.Name() != "." {
 			if info.IsDir() {
 				return fs.SkipDir
 			}
