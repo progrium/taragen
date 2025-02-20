@@ -19,6 +19,7 @@ func serveCmd() *cli.Command {
 				fatal(err)
 			}
 
+			// TODO: make port configurable via flag
 			fmt.Println("serving on http://localhost:8088 ...")
 
 			site := taragen.NewSite(wd)
