@@ -10,11 +10,14 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type Site struct {
 	dir   string
 	pages map[string]*Page
+
+	mu sync.Mutex
 }
 
 func NewSite(dir string) *Site {
@@ -25,7 +28,7 @@ func NewSite(dir string) *Site {
 }
 
 func (s *Site) WatchForReloads() {
-	go watchForReloads(s.dir)
+	go watchForReloads(s.dir, s)
 }
 
 func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
@@ -84,8 +87,21 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 	return nil
 }
 
-func (s *Site) Pages(name string) []*Page {
-	return s.Page(name).Subpages()
+func (s *Site) Pages(name string) (pages []*Page) {
+	if !strings.Contains(name, "*") {
+		return s.Page(name).Subpages()
+	}
+	for pathname, page := range s.pages {
+		m, err := path.Match(name, pathname)
+		if err != nil {
+			continue // TODO: log error
+		}
+		if m {
+			pages = append(pages, page.Subpages()...)
+		}
+	}
+	sortPages(pages)
+	return pages
 }
 
 func (s *Site) Page(normalPath string) *Page {
@@ -105,11 +121,8 @@ func (s *Site) Page(normalPath string) *Page {
 
 func (s *Site) IsPage(path string) bool {
 	normalPath := strings.TrimPrefix(path, "/")
-	p, ok := s.pages[normalPath]
-	if ok && !p.IsDir() {
-		return true
-	}
-	return false
+	_, ok := s.pages[normalPath]
+	return ok
 }
 
 func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte, error) {
@@ -130,6 +143,11 @@ func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte
 }
 
 func (s *Site) ParseAll() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.pages = make(map[string]*Page)
+
 	return filepath.Walk(s.dir, func(curPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -180,7 +198,7 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	normalPath := strings.TrimPrefix(r.URL.Path, "/")
+	normalPath := strings.Trim(r.URL.Path, "/")
 	if normalPath == "" {
 		normalPath = "."
 	}
