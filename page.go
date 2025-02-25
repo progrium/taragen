@@ -185,6 +185,9 @@ func (p *Page) Parse() error {
 		src, err = os.ReadFile(path.Join(p.site.dir, p.path+suffix))
 		if err == nil {
 			format = filepath.Ext(suffix)
+			if strings.HasPrefix(suffix, "/index") {
+				p.data[IsDir] = true
+			}
 			break
 		}
 	}
