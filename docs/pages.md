@@ -1,5 +1,0 @@
----
-title: Pages
----
-
-Content.
