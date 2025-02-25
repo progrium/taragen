@@ -16,7 +16,7 @@ import (
 
 var reloaders sync.Map
 
-func watchForReloads(dir string) {
+func watchForReloads(dir string, s *Site) {
 	wfs := watchfs.New(os.DirFS("/").(fs.StatFS))
 	w, err := wfs.Watch(strings.TrimPrefix(dir, "/"), &watchfs.Config{
 		Recursive: true,
@@ -27,7 +27,10 @@ func watchForReloads(dir string) {
 	for event := range w.Iter() {
 		if strings.HasSuffix(event.Path, ExtMarkdown) ||
 			strings.HasSuffix(event.Path, ExtJSX) ||
-			strings.HasSuffix(event.Path, ExtTemplate) {
+			strings.HasSuffix(event.Path, ExtTemplate) ||
+			event.IsDir() {
+
+			go s.ParseAll()
 
 			reloaders.Range(func(key, value any) bool {
 				if conn, ok := key.(*websocket.Conn); ok {
