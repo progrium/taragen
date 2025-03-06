@@ -260,7 +260,7 @@ code:not(pre > code), pre > code > div, .hljs {
 }
 
 pre > code {
-  display: flex;
+  /* display: flex; */
   overflow-x: auto;
   max-width: 100%;
 }
