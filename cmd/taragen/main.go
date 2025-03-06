@@ -20,7 +20,7 @@ func (m *Main) InitializeCLI(root *cli.Command) {
 	root.Version = Version
 
 	root.AddCommand(serveCmd())
-	root.AddCommand(generateCmd())
+	root.AddCommand(buildCmd())
 }
 
 func fatal(err error) {
