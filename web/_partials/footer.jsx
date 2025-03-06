@@ -1,4 +1,3 @@
-(message) =>
 <footer>
-    <p>{message}</p>
+    <p>Footer</p>
 </footer>

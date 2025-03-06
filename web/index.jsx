@@ -2,7 +2,6 @@ data({
     title: "Homepage"
 });
 <main>
-<h1>Taragen</h1>
 <ul>
 {pages(".").filter(page => page.slug != ".").map(page => 
     (page.isDir) 
