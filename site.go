@@ -179,9 +179,6 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 			}
 			return nil
 		}
-		if info.IsDir() {
-			return nil
-		}
 
 		isPage := false
 		for key := range Formats {
@@ -189,7 +186,7 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 				isPage = true
 			}
 		}
-		if !isPage {
+		if !isPage && !info.IsDir() {
 			return fn(curPath, "")
 		}
 
