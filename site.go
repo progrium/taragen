@@ -54,40 +54,54 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 		return err
 	}
 
-	var pages []*Page
-	for _, page := range s.pages {
-		if page.Draft() {
-			continue
-		}
-		pages = append(pages, page)
-	}
-	sortPages(pages)
-
-	for _, page := range pages {
-		if page.IsDir() {
-			continue
-		}
-		var targetPath string
-		if filepath.Ext(page.path) == "" || page.path == "." {
-			targetPath = path.Join(dest, page.path, "index.html")
+	return s.walk(func(filename string, pagepath string) error {
+		if pagepath == "" {
+			// static file
+			b, err := os.ReadFile(filename)
+			if err != nil {
+				return err
+			}
+			targetPath := path.Join(dest, strings.TrimPrefix(filename, s.dir))
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return err
+			}
+			if err := os.WriteFile(targetPath, b, 0644); err != nil {
+				return err
+			}
+			fmt.Println("copied:", strings.TrimPrefix(filename, s.dir))
 		} else {
-			targetPath = path.Join(dest, page.path)
-		}
-		fmt.Println(page.path)
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return err
-		}
-		f, err := os.Create(targetPath)
-		if err != nil {
-			return err
-		}
-		if err := page.Render(f); err != nil {
+			// page
+			p := s.Page(pagepath)
+			if len(p.Source()) == 0 {
+				fmt.Println("skip dir:", pagepath)
+				return nil
+			}
+			if p.Draft() {
+				fmt.Println("skip draft:", pagepath)
+				return nil
+			}
+			var targetPath string
+			if filepath.Ext(p.path) == "" || p.path == "." {
+				targetPath = path.Join(dest, p.path, "index.html")
+			} else {
+				targetPath = path.Join(dest, p.path)
+			}
+			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+				return err
+			}
+			f, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+			if err := p.Render(f); err != nil {
+				f.Close()
+				return err
+			}
 			f.Close()
-			return err
+			fmt.Println("rendered:", p.path)
 		}
-		f.Close()
-	}
-	return nil
+		return nil
+	})
 }
 
 func (s *Site) Pages(name string) (pages []*Page) {
@@ -148,12 +162,7 @@ func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte
 	return RenderTemplate(name, partialSrc, nil)
 }
 
-func (s *Site) ParseAll() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.pages = make(map[string]*Page)
-
+func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 	return filepath.Walk(s.dir, func(curPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -170,32 +179,52 @@ func (s *Site) ParseAll() error {
 			}
 			return nil
 		}
-		if !info.IsDir() {
-			found := false
-			for key := range Formats {
-				if strings.HasSuffix(info.Name(), key) {
-					found = true
-				}
-			}
-			if !found {
-				return nil
-			}
+		if info.IsDir() {
+			return nil
 		}
 
-		// normalize path
-		normalizedPath := strings.TrimPrefix(curPath, s.dir)
-		normalizedPath = strings.TrimSuffix(normalizedPath, filepath.Ext(normalizedPath))
-		normalizedPath = strings.TrimSuffix(normalizedPath, "/index")
-		if normalizedPath == "" {
-			normalizedPath = "."
+		isPage := false
+		for key := range Formats {
+			if strings.HasSuffix(info.Name(), key) {
+				isPage = true
+			}
+		}
+		if !isPage {
+			return fn(curPath, "")
 		}
 
-		if err := s.Page(normalizedPath).Parse(); err != nil {
+		return fn(curPath, s.normalizePath(curPath))
+	})
+}
+
+func (s *Site) ParseAll() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.pages = make(map[string]*Page)
+
+	return s.walk(func(filename string, pagepath string) error {
+		if pagepath == "" {
+			return nil
+		}
+
+		log.Println("parse:", pagepath)
+		if err := s.Page(pagepath).Parse(); err != nil {
 			return err
 		}
 
 		return nil
 	})
+}
+
+func (s *Site) normalizePath(p string) string {
+	normalized := strings.TrimPrefix(p, s.dir)
+	normalized = strings.TrimSuffix(normalized, filepath.Ext(normalized))
+	normalized = strings.TrimSuffix(normalized, "/index")
+	if normalized == "" {
+		normalized = "."
+	}
+	return normalized
 }
 
 func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
