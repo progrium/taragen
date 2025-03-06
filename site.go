@@ -208,7 +208,6 @@ func (s *Site) ParseAll() error {
 			return nil
 		}
 
-		log.Println("parse:", pagepath)
 		if err := s.Page(pagepath).Parse(); err != nil {
 			return err
 		}
