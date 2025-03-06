@@ -24,6 +24,7 @@ const (
 	IsDir       = "isDir"
 	Date        = "date"
 	ContentType = "contentType"
+	Draft       = "draft"
 )
 
 type Page struct {
@@ -56,27 +57,39 @@ func getData[T any](data Data, key string, fallback T) T {
 }
 
 func (p *Page) Body() []byte {
-	return []byte(getData[string](p.data, Body, ""))
+	return []byte(getData(p.data, Body, ""))
 }
 
 func (p *Page) Source() []byte {
-	return []byte(getData[string](p.data, Source, ""))
+	return []byte(getData(p.data, Source, ""))
 }
 
 func (p *Page) IsDir() bool {
-	return getData[bool](p.data, IsDir, false)
+	return getData(p.data, IsDir, false)
+}
+
+func (p *Page) Draft() bool {
+	if p.Date() != "" && p.Time().After(time.Now()) {
+		return true
+	}
+	return getData(p.data, Draft, false)
 }
 
 func (p *Page) Date() string {
-	return getData[string](p.data, Date, "")
+	return getData(p.data, Date, "")
+}
+
+func (p *Page) Time() time.Time {
+	t, _ := time.Parse("2006-01-02", p.Date())
+	return t
 }
 
 func (p *Page) Slug() string {
-	return getData[string](p.data, Slug, "")
+	return getData(p.data, Slug, "")
 }
 
 func (p *Page) ContentType() string {
-	return getData[string](p.data, ContentType, "text/html")
+	return getData(p.data, ContentType, "text/html")
 }
 
 func (p *Page) Subpages() (subpages []*Page) {
@@ -84,6 +97,9 @@ func (p *Page) Subpages() (subpages []*Page) {
 		if strings.HasPrefix(page.path, p.path+"/") || p.path == "." {
 			relPath := strings.TrimPrefix(page.path, p.path+"/")
 			if strings.Contains(relPath, "/") {
+				continue
+			}
+			if page.Draft() {
 				continue
 			}
 			subpages = append(subpages, page)

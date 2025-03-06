@@ -56,6 +56,9 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 
 	var pages []*Page
 	for _, page := range s.pages {
+		if page.Draft() {
+			continue
+		}
 		pages = append(pages, page)
 	}
 	sortPages(pages)
@@ -89,7 +92,10 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 
 func (s *Site) Pages(name string) (pages []*Page) {
 	if !strings.Contains(name, "*") {
-		return s.Page(name).Subpages()
+		if s.IsPage(name) {
+			return s.Page(name).Subpages()
+		}
+		return nil
 	}
 	for pathname, page := range s.pages {
 		m, err := path.Match(name, pathname)
