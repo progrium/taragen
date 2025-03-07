@@ -139,10 +139,21 @@ type hyperNode struct {
 }
 
 func (h hyperNode) isSelfClosing() bool {
-	return len(h.children) == 0 && !slices.Contains([]string{
-		"script",
+	return len(h.children) == 0 && slices.Contains([]string{
+		"area",
+		"base",
+		"br",
+		"col",
+		"embed",
+		"hr",
+		"img",
+		"input",
 		"link",
-		"iframe",
+		"meta",
+		"param",
+		"source",
+		"track",
+		"wbr",
 	}, h.tag)
 }
 
