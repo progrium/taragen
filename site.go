@@ -14,16 +14,18 @@ import (
 )
 
 type Site struct {
-	dir   string
-	pages map[string]*Page
+	dir    string
+	pages  map[string]*Page
+	drafts bool
 
 	mu sync.Mutex
 }
 
-func NewSite(dir string) *Site {
+func NewSite(dir string, drafts bool) *Site {
 	return &Site{
-		dir:   dir,
-		pages: make(map[string]*Page),
+		dir:    dir,
+		pages:  make(map[string]*Page),
+		drafts: drafts,
 	}
 }
 
