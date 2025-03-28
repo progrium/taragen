@@ -124,6 +124,8 @@ func hyper(tag string, attrs map[string]string, children ...any) hyperNode {
 			nodes = append(nodes, c)
 		case string:
 			nodes = append(nodes, hyperNode{text: c})
+		case int64:
+			nodes = append(nodes, hyperNode{text: fmt.Sprintf("%d", c)})
 		default:
 			log.Panicf("unsupported child type: %T (in %s)", child, tag)
 		}
