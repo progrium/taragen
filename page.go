@@ -94,12 +94,13 @@ func (p *Page) ContentType() string {
 
 func (p *Page) Subpages() (subpages []*Page) {
 	for _, page := range p.site.pages {
+
 		if strings.HasPrefix(page.path, p.path+"/") || p.path == "." {
 			relPath := strings.TrimPrefix(page.path, p.path+"/")
 			if strings.Contains(relPath, "/") {
 				continue
 			}
-			if page.Draft() {
+			if !p.site.drafts && page.Draft() {
 				continue
 			}
 			subpages = append(subpages, page)
