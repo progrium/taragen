@@ -257,7 +257,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 	// Find all layout files in parent directories
 	defaultLayouts := []string{}
 	if origLayout == nil {
-		dir := filepath.Dir(p.path)
+		dir := p.path
 		for {
 			// Check for JSX layout
 			jsxLayoutPath := path.Join(dir, "_layout"+ExtJSX)
