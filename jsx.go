@@ -10,7 +10,7 @@ import (
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-func setupJSX(src []byte) (*goja.Runtime, string, error) {
+func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
 	transform := api.Transform(string(src), api.TransformOptions{
 		Loader:         api.LoaderJSX,
 		JSXFactory:     "hyper",
@@ -18,7 +18,7 @@ func setupJSX(src []byte) (*goja.Runtime, string, error) {
 		JSXSideEffects: true,
 	})
 	if len(transform.Errors) > 0 {
-		return nil, "", fmt.Errorf("error parsing JSX: %s", transform.Errors[0].Text)
+		return nil, "", fmt.Errorf("error parsing JSX: %s (%s:%d)", transform.Errors[0].Text, name, transform.Errors[0].Location.Line)
 	}
 
 	vm := goja.New()
@@ -29,8 +29,8 @@ func setupJSX(src []byte) (*goja.Runtime, string, error) {
 	return vm, string(transform.Code), nil
 }
 
-func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) {
-	vm, jsCode, err := setupJSX(src)
+func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]byte, error) {
+	vm, jsCode, err := setupJSX(name, src)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +82,8 @@ func RenderJSX(src []byte, globals map[string]any, args ...any) ([]byte, error) 
 	return []byte(node.String()), nil
 }
 
-func ExportJSX(src []byte, globals map[string]any) (map[string]any, error) {
-	vm, jsCode, err := setupJSX(src)
+func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any, error) {
+	vm, jsCode, err := setupJSX(name, src)
 	if err != nil {
 		return nil, err
 	}

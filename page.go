@@ -135,7 +135,7 @@ func (p *Page) loadGlobals() error {
 		if err != nil {
 			return err
 		}
-		g, err := ExportJSX(globalsSrc, globals)
+		g, err := ExportJSX(globalsPath, globalsSrc, globals)
 		if err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ func (p *Page) loadDefaults() error {
 		if err != nil {
 			return err
 		}
-		data, err := ExportJSX(dataSrc, p.globals)
+		data, err := ExportJSX(dataPath, dataSrc, p.globals)
 		if err != nil {
 			return err
 		}
@@ -300,7 +300,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 			isJSX = false
 		}
 		if isJSX {
-			out, err = RenderJSX(layoutSrc, p.globals, string(out))
+			out, err = RenderJSX(layoutPath, layoutSrc, p.globals, string(out))
 			if err != nil {
 				return err
 			}

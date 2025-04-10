@@ -1,6 +1,7 @@
 package taragen
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
@@ -70,6 +71,49 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 			}
 		}
 	}()
-	out, err = RenderJSX(p.Source(), p.globals)
+	// wrapping in fragment to allow for multiple root elements
+	// but also ensure partial and other jsx expressions render
+	var src []byte
+	if !hasClosingTag(p.Source()) {
+		src = []byte("<>")
+		src = append(src, p.Source()...)
+		src = append(src, []byte("</>")...)
+	} else {
+		src = p.Source()
+	}
+	out, err = RenderJSX(p.path, src, p.globals)
 	return
+}
+
+func hasClosingTag(data []byte) bool {
+	// Handle empty input
+	if len(data) == 0 {
+		return false
+	}
+
+	// Trim trailing newlines to handle the case where data ends with newline(s)
+	trimmedData := bytes.TrimRight(data, "\n\r")
+	if len(trimmedData) == 0 {
+		return false // All data was newlines
+	}
+
+	// Find the last line by locating the last newline
+	lastLineIndex := bytes.LastIndex(trimmedData, []byte("\n"))
+
+	// If no newline found, check the entire data
+	var lastLine []byte
+	if lastLineIndex == -1 {
+		lastLine = trimmedData
+	} else {
+		// Get the last line (exclude the newline character)
+		lastLine = trimmedData[lastLineIndex+1:]
+	}
+
+	// Trim leading whitespace
+	lastLine = bytes.TrimLeftFunc(lastLine, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\r'
+	})
+
+	// Check if it starts with "</"
+	return bytes.HasPrefix(lastLine, []byte("</"))
 }

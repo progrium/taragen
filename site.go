@@ -159,7 +159,7 @@ func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte
 		isJSX = false
 	}
 	if isJSX {
-		return RenderJSX(partialSrc, globals, args...)
+		return RenderJSX(partialPath, partialSrc, globals, args...)
 	}
 	return RenderTemplate(name, partialSrc, nil)
 }

@@ -50,7 +50,7 @@ func TestJSX(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := RenderJSX([]byte(tt.input), tt.globals, tt.args...)
+			result, err := RenderJSX(tt.name, []byte(tt.input), tt.globals, tt.args...)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -66,7 +66,7 @@ func TestJSXWithPageData(t *testing.T) {
 	globals := map[string]any{"page": pageData}
 	input := `data({bar: "page"}); <div>{page.foo}_{page.bar}</div>`
 
-	result, err := RenderJSX([]byte(input), globals)
+	result, err := RenderJSX("test", []byte(input), globals)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
