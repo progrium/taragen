@@ -111,7 +111,7 @@ func ExportJSX(src []byte, globals map[string]any) (map[string]any, error) {
 	return out, nil
 }
 
-func hyper(tag string, attrs map[string]string, children ...any) hyperNode {
+func hyper(tag string, attrs map[string]any, children ...any) hyperNode {
 	var nodes []hyperNode
 	for _, child := range children {
 		if child == nil {
@@ -135,7 +135,7 @@ func hyper(tag string, attrs map[string]string, children ...any) hyperNode {
 
 type hyperNode struct {
 	tag      string
-	attrs    map[string]string
+	attrs    map[string]any
 	children []hyperNode
 	text     string
 }
@@ -174,7 +174,20 @@ func (h hyperNode) String() string {
 			var i int
 			for k, v := range h.attrs {
 				i++
-				builder.WriteString(k + "=\"" + v + "\"")
+				switch vv := v.(type) {
+				case string:
+					builder.WriteString(k + "=\"" + vv + "\"")
+				case map[string]any:
+					// assuming this is a style object
+					var style strings.Builder
+					for k, v := range vv {
+						style.WriteString(k + ":" + v.(string) + ";")
+					}
+					builder.WriteString(k + "=\"" + style.String() + "\"")
+				default:
+					log.Panicf("unsupported attr type: %T (in %s)", vv, h.tag)
+				}
+
 				if i < len(h.attrs) {
 					builder.WriteString(" ")
 				}
