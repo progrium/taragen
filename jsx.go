@@ -176,6 +176,9 @@ func (h hyperNode) String() string {
 				i++
 				switch vv := v.(type) {
 				case string:
+					if vv == "" {
+						continue
+					}
 					builder.WriteString(k + "=\"" + vv + "\"")
 				case map[string]any:
 					// assuming this is a style object
