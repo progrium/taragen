@@ -73,47 +73,35 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 	}()
 	// wrapping in fragment to allow for multiple root elements
 	// but also ensure partial and other jsx expressions render
-	var src []byte
-	if !hasClosingTag(p.Source()) {
-		src = []byte("<>")
-		src = append(src, p.Source()...)
-		src = append(src, []byte("</>")...)
-	} else {
-		src = p.Source()
+	src, err := wrapJSX(p.Source())
+	if err != nil {
+		return nil, Data{}, err
 	}
 	out, err = RenderJSX(p.path, src, p.globals)
+	if err != nil {
+		fmt.Printf("error source: %s: %s\n", p.path, string(src))
+		return
+	}
 	return
 }
 
-func hasClosingTag(data []byte) bool {
-	// Handle empty input
-	if len(data) == 0 {
-		return false
+func wrapJSX(data []byte) ([]byte, error) {
+	dataIdx := bytes.Index(data, []byte("data"))
+	if dataIdx == -1 {
+		return fragmentWrap(data), nil
 	}
-
-	// Trim trailing newlines to handle the case where data ends with newline(s)
-	trimmedData := bytes.TrimRight(data, "\n\r")
-	if len(trimmedData) == 0 {
-		return false // All data was newlines
+	dataTermIdx := bytes.Index(data, []byte(";"))
+	if dataTermIdx == -1 {
+		return nil, fmt.Errorf("expected data statement terminator (';') not found")
 	}
+	out := data[:dataTermIdx+1]
+	out = append(out, fragmentWrap(data[dataTermIdx+1:])...)
+	return out, nil
+}
 
-	// Find the last line by locating the last newline
-	lastLineIndex := bytes.LastIndex(trimmedData, []byte("\n"))
-
-	// If no newline found, check the entire data
-	var lastLine []byte
-	if lastLineIndex == -1 {
-		lastLine = trimmedData
-	} else {
-		// Get the last line (exclude the newline character)
-		lastLine = trimmedData[lastLineIndex+1:]
-	}
-
-	// Trim leading whitespace
-	lastLine = bytes.TrimLeftFunc(lastLine, func(r rune) bool {
-		return r == ' ' || r == '\t' || r == '\r'
-	})
-
-	// Check if it starts with "</"
-	return bytes.HasPrefix(lastLine, []byte("</"))
+func fragmentWrap(data []byte) (out []byte) {
+	out = []byte("<>")
+	out = append(out, data...)
+	out = append(out, []byte("</>")...)
+	return
 }
