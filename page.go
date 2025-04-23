@@ -25,6 +25,7 @@ const (
 	Date        = "date"
 	ContentType = "contentType"
 	Draft       = "draft"
+	Preamble    = "preamble"
 )
 
 type Page struct {
@@ -90,6 +91,14 @@ func (p *Page) Slug() string {
 
 func (p *Page) ContentType() string {
 	return getData(p.data, ContentType, "text/html")
+}
+
+func (p *Page) Preamble() string {
+	preamble := getData(p.data, Preamble, "")
+	if preamble == "" && p.ContentType() == "text/html" {
+		preamble = "<!DOCTYPE html>"
+	}
+	return preamble
 }
 
 func (p *Page) Subpages() (subpages []*Page) {
@@ -285,7 +294,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 	out := p.Body()
 	for {
 		layout, ok := p.data[Layout].(string)
-		if !ok {
+		if !ok || layout == "" {
 			break
 		}
 		// TODO: could this be replaced with call to p.Site.Partial?
@@ -328,6 +337,10 @@ func (p *Page) Render(w io.Writer) (err error) {
 		} else {
 			defaultLayouts = nil
 		}
+	}
+	_, err = w.Write([]byte(p.Preamble() + "\n"))
+	if err != nil {
+		return
 	}
 	if p.ContentType() == "text/html" {
 		out = gohtml.FormatBytes(out)
