@@ -1,13 +1,13 @@
-.PHONY: build install-del install web-build web-serve
+.PHONY: build link web-build web-serve
+
+BIN ?= /usr/local/bin
 
 build:
-	go build -o ./taragen ./cmd/taragen
+	go build -o ./local/bin/taragen ./cmd/taragen
 
-install-del: 
-	rm -f $(shell command -v taragen)
-install: build
-	mv ./taragen /usr/local/bin/taragen
-
+link: build
+	rm -f $(BIN)/taragen
+	ln -s $(PWD)/local/bin/taragen $(BIN)/taragen
 
 web-build:
 	cd web && taragen build
