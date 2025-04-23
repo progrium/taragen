@@ -1,4 +1,3 @@
-<>
 <h1>Blog</h1>
 {pages("blog").filter(page => page.isDir).reverse().map(year => (
     <div>
@@ -13,4 +12,3 @@
       </ul>
     </div>
   ))}
-</>
