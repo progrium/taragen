@@ -343,6 +343,7 @@ func (p *Page) Render(w io.Writer) (err error) {
 		return
 	}
 	if p.ContentType() == "text/html" {
+		gohtml.Condense = true
 		out = gohtml.FormatBytes(out)
 	}
 	_, err = w.Write(out)
