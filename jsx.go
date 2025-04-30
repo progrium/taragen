@@ -187,6 +187,10 @@ func (h hyperNode) String() string {
 						style.WriteString(k + ":" + v.(string) + ";")
 					}
 					builder.WriteString(k + "=\"" + style.String() + "\"")
+				case bool:
+					if vv {
+						builder.WriteString(k)
+					}
 				default:
 					log.Panicf("unsupported attr type: %T (in %s)", vv, h.tag)
 				}
