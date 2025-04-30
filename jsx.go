@@ -1,6 +1,7 @@
 package taragen
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"slices"
@@ -30,7 +31,7 @@ func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
 }
 
 func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]byte, error) {
-	vm, jsCode, err := setupJSX(name, src)
+	vm, jsCode, err := setupJSX(name, replacePreNewlines(src))
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]
 	if err != nil {
 		return nil, err
 	}
-	return []byte(node.String()), nil
+	return []byte(replaceNewlines(node.String())), nil
 }
 
 func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any, error) {
@@ -215,4 +216,22 @@ func (h hyperNode) String() string {
 		builder.WriteString("</" + h.tag + ">")
 	}
 	return builder.String()
+}
+
+func replacePreNewlines(data []byte) []byte {
+	// Replace newlines with <newline /> between <pre> tags
+	parts := bytes.Split(data, []byte("<pre>"))
+	for i := 1; i < len(parts); i++ {
+		if preEnd := bytes.Index(parts[i], []byte("</pre>")); preEnd != -1 {
+			preContent := parts[i][:preEnd]
+			afterPre := parts[i][preEnd:]
+			preContent = bytes.ReplaceAll(preContent, []byte("\n"), []byte("<newline />"))
+			parts[i] = append(preContent, afterPre...)
+		}
+	}
+	return bytes.Join(parts, []byte("<pre>"))
+}
+
+func replaceNewlines(s string) string {
+	return strings.ReplaceAll(s, "<newline></newline>", "\n")
 }
