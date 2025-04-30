@@ -21,6 +21,7 @@
         </nav>
 
         <main class="grow">
+            <h1>{page.title}</h1>
             {content}
         </main>
     </div>

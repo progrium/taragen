@@ -250,19 +250,24 @@ input[type="text"] {
   background-color: var(--primary);
 }
 
-code:not(pre > code), pre > code > div, .hljs {
+code {
+  font-family: "Inconsolata";
+  font-size: inherit;
+}
+pre {
   background-color: var(--gray-900);
   color: var(--white);
-  font-size: smaller;
   line-height: var(--6);
   border-radius: 4px;
-  padding: var(--2);
+  padding: var(--2) var(--3);
 }
-
 pre > code {
   /* display: flex; */
   overflow-x: auto;
   max-width: 100%;
+}
+code:not(pre>code) {
+  font-weight: 800;
 }
 
 /*code editor color theme (temporarily borrowed from nite owl)*/
