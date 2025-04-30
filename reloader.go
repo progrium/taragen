@@ -30,7 +30,7 @@ func watchForReloads(dir string, s *Site) {
 			strings.HasSuffix(event.Path, ExtTemplate) ||
 			event.IsDir() {
 
-			go s.ParseAll()
+			s.ParseAll()
 
 			reloaders.Range(func(key, value any) bool {
 				if conn, ok := key.(*websocket.Conn); ok {
