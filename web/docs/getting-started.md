@@ -97,8 +97,8 @@ In a top-level /partials directory, add a ```_nav.jsx``` file with:
 
 
 To reference the partial:
-TODO: these need extra curly braces but that causes a parsing error
-```{ partial "_nav" }``` for Markdown, or ``` partial("_nav")``` for jsx.
+`{{ safeHTML `{{ partial "_nav" }}` }}` for Markdown, 
+or ``` {partial("_nav")}``` for jsx.
 
 ## Globals
 The ```_globals.jsx``` file is javascript that is available everywhere. You can put variables, helper functions, etc. in it.
