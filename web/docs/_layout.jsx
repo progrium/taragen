@@ -1,7 +1,6 @@
 (content) =>
-<section>
-    <div class="row justify-center items-start sm:stack" style="gap: var(--16)">
-        <nav class="flex: none; min-width: 256px;">
+<>
+        <nav>
             <ul>
             {pages("docs").map(page => (
                 <li>
@@ -20,10 +19,10 @@
             </ul>
         </nav>
 
-        <main class="grow">
+        <section>
             <h1>{page.title}</h1>
             {content}
-        </main>
-    </div>
-</section>
+        </section>
+
+</>
     

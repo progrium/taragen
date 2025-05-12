@@ -1,20 +1,21 @@
-
 @font-face {
   font-family: 'Perfectly Nineties';
-  src: url('../_fonts/PerfectlyNineties-Bold.otf') format('opentype');
+  src: url('/_assets/fonts/PerfectlyNineties-Bold.otf') format('opentype');
   font-weight: bold;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Perfectly Nineties';
-  src: url('../_fonts/PerfectlyNineties-Semibold.otf') format('opentype');
+  src: url('/_assets/fonts/PerfectlyNineties-Semibold.otf') format('opentype');
   font-weight: 600;
   font-style: normal;
 }
 
 :root {
   font-size: 16px;
+  --text-s: 0.8rem;
+  --text-l: 1.2rem;
   --padding-xs: calc(var(--padding) / 4);
   --padding-s: calc(var(--padding) / 2);
   --padding: 1rem;
@@ -23,13 +24,29 @@
   --padding-xl: calc(var(--padding) * 3);
   --padding-xxl: calc(var(--padding) * 4);
   --black: oklch(20.27% 0.01 39.3);
-  --orange: #EA783A;
+  --orange: oklch(0.69 0.1594 46.61);
   --black: #000;
   --white: #fff;
+  --orange-300: oklch(0.85 0.1594 46.61);
+  --orange-700: oklch(0.49 0.1594 46.61);
+  --brown: oklch(0.28 0.0352 46.61);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* GLOBAL LAYOUT -------------------------- */
+
+html, body {
+  min-height: 100vh;
+}
+
+header > nav, footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--padding-xl);
 }
 
 body {
@@ -37,10 +54,42 @@ body {
   color: var(--white);
   line-height: 1.5;
   background-color: var(--black);
-  margin: var(--padding) 0;
+  width: 912px;
+  margin: var(--padding) auto var(--padding-xxl) auto;
+  padding-bottom: var(--padding-xxl);
+  display: flex;
+  flex-direction: column;
 }
 
-/* GLOBAL -------------------------- */
+main {
+  flex: 1;
+  margin-top: var(--padding-xxl);
+}
+
+/* any page that doesn't have a sidebar nav inside */
+main:not(:has(nav + section)) {
+  margin-left: var(--padding-xxl);
+  margin-right: var(--padding-xxl);
+}
+
+main > section {
+  margin-bottom: var(--padding-xxl);
+}
+
+/* NAV + SECTION inside of main (docs) */
+main > nav {
+  width: 256px;
+  flex-shrink: 0;
+}
+main > section {
+  flex: 1;
+}
+main:has(nav+section) {
+  display: flex;
+  gap: var(--padding-l);
+}
+
+/* TYPOGRAPHY -------------------------- */
 
 h1, h2, h3, h4, p.h3 {
   font-family: 'Perfectly Nineties';
@@ -56,31 +105,39 @@ p.small-text { font-size: 0.8rem;}
 
 h1, h2, h3, h4, p { margin-bottom: var(--padding-s); }
 h1 + p { margin-top: var(--padding); }
-h2:not(:first-child) { margin-top: var(--padding-l); }
-h3 { margin-top: var(--padding); }
+h2:not(:first-child) { margin-top: var(--padding-xl); }
+h3 { margin-top: var(--padding-l); }
 h4 { margin-top: var(--padding-s); }
 ul, p { margin-top: 0px; }
 
 a {
   text-decoration: underline;
-  font-weight: var(--weight-semibold);
+  font-weight: bold;
+  color: var(--orange);
 }
+
+nav a {
+  text-decoration: none;
+}
+header nav a {
+  font-size: var(--text-l);
+  font-family: 'Perfectly Nineties';
+
+}
+
 
 /*------------SECTIONS------------*/
-/* everything is in main, sections are inside of main */
-
-section {
-  width: 768px;
-  margin: 0 auto var(--padding-xl) auto;
-
-}
 
 /*-----homepage sections-----*/
+
+section#hero-banner img {
+  width: 100%;
+}
 
 section#feature-list {
   border-top: 2px solid var(--orange);
   border-bottom: 2px solid var(--orange);
-  padding: var(--padding-l) var(--padding-xl);
+  padding: var(--padding) var(--padding-xl);
 }
 section#feature-list div:not(:last-child) {
   margin-bottom: var(--padding-l);
@@ -96,7 +153,8 @@ code {
 pre {
   color: var(--white);
   padding: var(--padding) var(--padding-l);
-  border: 1px solid var(--orange);
+  /* border: 1px solid var(--orange-300); */
+  background-color: var(--brown);
 }
 pre > code {
   /* display: flex; */
