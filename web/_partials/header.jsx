@@ -1,9 +1,8 @@
 <header>
-    <nav class="row">
+    <nav>
       <a href="/" class="logo">
-        <span>Taragen</span>
+        <span>Home</span>
       </a>
-      <span class="grow"> </span>
       <a href="/docs">Docs</a>
       <a class="button" href="https://github.com/progrium/taragen">
         <svg class="icon" width="24" height="24" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" >
