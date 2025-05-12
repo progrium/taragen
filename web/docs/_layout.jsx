@@ -1,6 +1,6 @@
 (content) =>
 <>
-        <nav>
+        <nav class="sidebar">
             <ul>
             {pages("docs").map(page => (
                 <li>

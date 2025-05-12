@@ -18,9 +18,9 @@ formatDate = (date, format) => {
 }
 ```
 
-Now on one of your jsx pages, you can do:
+Now on one of your JSX pages, you can do:
 ```
 <p>{formatDate(new Date(), 'MM/dd/yyyy')}</p>
 ```
 
-TODO: can you use this in markdown?
+Note: globals are not directly available for Markdown pages, though you could create a partial and use it on a Markdown page.

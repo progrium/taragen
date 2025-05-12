@@ -36,7 +36,7 @@ Inside the blog/_layout.jsx file, add the following:
 	
 Inside /blog, create an index.jsx file for the homepage. Add the following:
 
-*Note the empty tags, because jsx requires a single outer element.*
+*Note the empty tags, because JSX requires a single outer element.*
 
 ```
 {{ safeHTML `<>

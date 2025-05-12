@@ -10,12 +10,12 @@ brew tap progrium/homebrew-taps
 brew install taragen
 ```
 
-TODO: add instructions for symlink?
-
 ## Overview
 
-* Pages can be .jsx files or .md files
-* Any filename that begins with an underscore will be hidden. For example, _layout.jsx, _globals.jsx, _partials.jsx
+* Pages can be JSX files or Markdown files
+* Globals is a file that can contain JSX functions, variables, etc. that can be used in your templates
+* Partials allow you to reuse components or other bits of code
+* Layouts are nested according to the file hierarchy. Layouts can be JSX or Go templates.
 
 ## Hello World
 
@@ -37,7 +37,7 @@ taragen serve
 ## Adding Pages
 A single page can either go in a directory or not. About/index.jsx or about.jsx will resolve to /about. You can do this for posts as well, which can be useful if you have several files that would be grouped with a single blog post.
 
-Note: .jsx files MUST have a single outer element. Most of the time Taragen can detect this and add it for you, but if you run into any odd parsing errors that might be why. 
+Note: JSX files MUST have a single outer element. Most of the time Taragen can detect this and add it for you, but if you run into any odd parsing errors that might be why. 
 
 ## Layouts
 Taragen is designed to use nested layouts. That is, a page will use the ```_layout.jsx``` file that's in the same directory, and that layout will be nested inside any layouts that are in parent directories.
@@ -60,7 +60,7 @@ In this example, we’re going to make a layout for a specific page. We have an 
 ```
 
 ### Override Default Layout Behavior
-If you want to override the default behavior, simply specify the layout in the markdown metadata like so:
+If you want to override the default behavior, simply specify the layout in the Markdown metadata like so:
 
 ```
 ---
@@ -98,7 +98,7 @@ In a top-level /partials directory, add a ```_nav.jsx``` file with:
 
 To reference the partial:
 `{{ safeHTML `{{ partial "_nav" }}` }}` for Markdown, 
-or ``` {partial("_nav")}``` for jsx.
+or ``` {partial("_nav")}``` for JSX.
 
 ## Globals
 The ```_globals.jsx``` file is javascript that is available everywhere. You can put variables, helper functions, etc. in it.
@@ -116,7 +116,7 @@ In your index.jsx file, add the siteName variable. The value in globals will be 
     </body>
 </html>
 ```
-Note: Because it’s a jsx file, you can also create HTML element variables like ```siteName = <h4>My Site</h4>```
+Note: Because it’s a JSX file, you can also create HTML element variables like ```siteName = <h4>My Site</h4>```
 
 ## Helpers
 

@@ -2,7 +2,7 @@
 title: Active state for navigation
 ---
 
-In your jsx page file (or layout file), reference a nav partial:
+In your  page file (or layout file), reference a nav partial:
 ```
 {partial("_nav")}
 ```

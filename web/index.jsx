@@ -30,22 +30,14 @@ data({
     brew install taragen
     </code></pre>
 
-    <p><strong>TODO:</strong> add instructions for symlink?</p>
-
-    <h3>Overview</h3>
-    <ul>
-        <li>Pages can be .jsx files or .md files</li>
-        <li>Any filename that begins with an underscore will be hidden. For example, <code>_layout.jsx</code>, <code>_globals.jsx</code>, <code>_partials.jsx</code></li>
-    </ul>
-
     <h3>Hello World</h3>
     <p>Create a directory for your site. From that directory, create an <code>index.jsx</code> file with simple HTML:</p>
     <pre><code>
-        &lt;html&gt;
-            &lt;body&gt;
-                &lt;h1&gt;Hello World&lt;/h1&gt;
-            &lt;/body&gt;
-        &lt;/html&gt;
+{`&lt;html&gt;
+    &lt;body&gt;
+        &lt;h1&gt;Hello World&lt;/h1&gt;
+    &lt;/body&gt;
+&lt;/html&gt;`}
     </code></pre>
     <p>Then run:</p>
     <pre><code>taragen serve
