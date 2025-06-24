@@ -2,11 +2,11 @@
 title: Implement an RSS feed
 ---
 
-We've added a metadata option called "preamble" that allows you to insert a tag at the start of the layout, to better support RSS feeds.
+We've added a page data option called `preamble` that allows you to insert a tag at the start of the layout, to better support RSS feeds.
 
-As you can see in the example, you need to explicitly set it to layout = empty string, so it does not use one of the existing layouts.
+As you can see in the example, you need to explicitly set it to `layout = ""`, so it does not use one of the existing layouts.
 
-In this example, we have a blog directory with a feed.xml.jsx file inside of it, with the following:
+In this example, we have a blog directory with a `feed.xml.jsx` file inside of it, with the following:
 
 ```
 data({
