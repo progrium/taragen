@@ -4,11 +4,11 @@ title: Setting up a blog
 
 Create a blog directory in your root folder.
 
-Inside the blog directory, add a _layout.jsx file.
+Inside the blog directory, add a `_layout.jsx` file.
 
 We recommend grouping posts by date, so create a directory inside blog for the current year.
 
-Inside the current year, create a file called post-title.md with the following format:
+Inside the current year, create a file called `post-title.md` with the following format:
 
 
 ```
@@ -22,7 +22,7 @@ content
 
 
 	
-Inside the blog/_layout.jsx file, add the following:
+Inside the `blog/_layout.jsx` file, add the following:
 
 ```
 (content) =>
@@ -34,7 +34,7 @@ Inside the blog/_layout.jsx file, add the following:
     </div>
 ```
 	
-Inside /blog, create an index.jsx file for the homepage. Add the following:
+Inside `/blog`, create an `index.jsx` file for the homepage. Add the following:
 
 *Note the empty tags, because JSX requires a single outer element.*
 
