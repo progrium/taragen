@@ -14,7 +14,7 @@ Add the following to a CSS file:
 }
 ```
 
-Create a nav.jsx file with:
+Create a `nav.jsx` file with:
 ```
 () => {
   const navLink = (href, text) => {
