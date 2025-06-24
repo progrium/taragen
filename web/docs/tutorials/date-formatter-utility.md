@@ -2,7 +2,7 @@
 title: Date formatter utility
 ---
 
-Add the following to your _globals.jsx file:
+Add the following to your `_globals.jsx` file:
 ```
 formatDate = (date, format) => {
 	const map = {
