@@ -1,10 +1,14 @@
 name: Build
 on: [push]
-
+env:
+  GO_VERSION: '1.23.1'
 jobs:
-  build:
-    concurrency: ci-${{ github.ref }}
+  build-windows:
     runs-on: ubuntu-latest
+    name: Build Taragen for Windows
+    env:
+      DIST_OS: windows
+      DIST_ARCH: arm64 amd64
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -12,14 +16,61 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: ${{ env.GO_VERSION }}
           check-latest: true
 
-      - name: Build project
-        run: |
-          make archive
-      
+      - name: Build project for distribution
+        run: make dist
+
       - uses: actions/upload-artifact@v4
         with:
-          name: taragen-dist
-          path: dist/
+          name: taragen-windows
+          path: dist/*
+  
+  build-linux:
+    runs-on: ubuntu-latest
+    name: Build Taragen for Linux
+    env:
+      DIST_OS: linux
+      DIST_ARCH: arm64 amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build project for distribution
+        run: make dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taragen-linux
+          path: dist/*
+
+  build-darwin:
+    runs-on: macos-latest
+    name: Build Taragen for Darwin
+    env:
+      DIST_OS: darwin
+      DIST_ARCH: arm64 amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build project for distribution
+        run: make dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taragen-darwin
+          path: dist/*
