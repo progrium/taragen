@@ -51,12 +51,12 @@ jobs:
           name: taragen-linux
           path: dist/*
 
-  build-darwin:
+  build-darwin-arm64:
     runs-on: macos-latest
-    name: Build for Darwin
+    name: Build for Darwin (arm64)
     env:
       DIST_OS: darwin
-      DIST_ARCH: arm64 amd64
+      DIST_ARCH: arm64
       AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
       AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
       AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
@@ -103,8 +103,64 @@ jobs:
         run: |
           xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taragen-darwin-arm64
+          path: taragen
+
+  build-darwin-amd64:
+    runs-on: macos-12
+    name: Build for Darwin (amd64)
+    env:
+      DIST_OS: darwin
+      DIST_ARCH: amd64
+      AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+      AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+      AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
+      SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
+      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build project for distribution
+        run: |
+          make build
+          mv ./local/bin/taragen ./taragen
+
+      - name: Setup signing certificate
+        run: |
+          echo "$SIGNING_CERTIFICATE" | base64 --decode > cert.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import cert.p12 -k build.keychain -P "$SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Sign
+        run: |
+          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
+      
+      - name: Prepare for notarization
+        run: zip taragen.zip taragen
+      
+      - name: Write API key file
+        run: |
+          echo "$AC_PRIVATE_KEY" | base64 --decode > private_key.p8
+          xcrun notarytool store-credentials --key private_key.p8 \
+            --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" ac-profile
+
+      - name: Notarize
+        run: |
+          xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
 
       - uses: actions/upload-artifact@v4
         with:
-          name: taragen-darwin
+          name: taragen-darwin-amd64
           path: taragen
