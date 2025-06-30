@@ -97,7 +97,7 @@ jobs:
         run: |
           echo "$AC_PRIVATE_KEY" | base64 --decode > private_key.p8
           xcrun notarytool store-credentials --key private_key.p8 \
-            --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" --apple-id-profile ac-profile
+            --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" ac-profile
 
       - name: Notarize
         run: |
