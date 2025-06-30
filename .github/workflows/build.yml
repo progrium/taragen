@@ -109,7 +109,7 @@ jobs:
           path: taragen
 
   build-darwin-amd64:
-    runs-on: macos-12
+    runs-on: macos-13
     name: Build for Darwin (amd64)
     env:
       DIST_OS: darwin
