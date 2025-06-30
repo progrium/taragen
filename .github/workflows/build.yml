@@ -5,7 +5,7 @@ env:
 jobs:
   build-windows:
     runs-on: ubuntu-latest
-    name: Build for Windows
+    name: Build for Windows (arm64,amd64)
     env:
       DIST_OS: windows
       DIST_ARCH: arm64 amd64
@@ -22,14 +22,21 @@ jobs:
       - name: Build project for distribution
         run: make dist
 
+      - run: mv dist/*_arm64 ./taragen
       - uses: actions/upload-artifact@v4
         with:
-          name: taragen-windows
-          path: dist/*
-  
+          name: taragen-windows-arm64
+          path: taragen
+
+      - run: mv dist/*_amd64 ./taragen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taragen-windows-amd64
+          path: taragen
+
   build-linux:
     runs-on: ubuntu-latest
-    name: Build for Linux
+    name: Build for Linux (arm64,amd64)
     env:
       DIST_OS: linux
       DIST_ARCH: arm64 amd64
@@ -46,10 +53,17 @@ jobs:
       - name: Build project for distribution
         run: make dist
 
+      - run: mv dist/*_arm64 ./taragen
       - uses: actions/upload-artifact@v4
         with:
-          name: taragen-linux
-          path: dist/*
+          name: taragen-linux-arm64
+          path: taragen
+
+      - run: mv dist/*_amd64 ./taragen
+      - uses: actions/upload-artifact@v4
+        with:
+          name: taragen-linux-amd64
+          path: taragen
 
   build-darwin-arm64:
     runs-on: macos-latest
