@@ -5,7 +5,7 @@ env:
 jobs:
   build-windows:
     runs-on: ubuntu-latest
-    name: Build Taragen for Windows
+    name: Build for Windows
     env:
       DIST_OS: windows
       DIST_ARCH: arm64 amd64
@@ -29,7 +29,7 @@ jobs:
   
   build-linux:
     runs-on: ubuntu-latest
-    name: Build Taragen for Linux
+    name: Build for Linux
     env:
       DIST_OS: linux
       DIST_ARCH: arm64 amd64
@@ -53,10 +53,15 @@ jobs:
 
   build-darwin:
     runs-on: macos-latest
-    name: Build Taragen for Darwin
+    name: Build for Darwin
     env:
       DIST_OS: darwin
       DIST_ARCH: arm64 amd64
+      AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+      AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+      AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
+      SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
+      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -68,9 +73,40 @@ jobs:
           check-latest: true
 
       - name: Build project for distribution
-        run: make dist
+        run: |
+          make build
+          mv ./local/bin/taragen ./taragen
+
+      - name: Setup signing certificate
+        run: |
+          echo "$SIGNING_CERTIFICATE" | base64 --decode > cert.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import cert.p12 -k build.keychain -P "$SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+      - name: Sign
+        run: |
+          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
+      
+      - name: Prepare for notarization
+        run: zip taragen.zip taragen
+      
+      - name: Write API key file
+        run: |
+          echo "$AC_PRIVATE_KEY" | base64 --decode > private_key.p8
+          xcrun notarytool store-credentials --key private_key.p8 \
+            --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" --apple-id-profile ac-profile
+
+      - name: Notarize
+        run: |
+          xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
+
+      - name: Staple
+        run: xcrun stapler staple taragen
 
       - uses: actions/upload-artifact@v4
         with:
           name: taragen-darwin
-          path: dist/*
+          path: taragen
