@@ -103,8 +103,6 @@ jobs:
         run: |
           xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
 
-      - name: Staple
-        run: xcrun stapler staple -v taragen
 
       - uses: actions/upload-artifact@v4
         with:
