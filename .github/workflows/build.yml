@@ -2,10 +2,15 @@ name: Build
 on: [push]
 env:
   GO_VERSION: '1.23.1'
+  AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+  AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
+  AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
+  SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
+  SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
 jobs:
   build-windows:
     runs-on: ubuntu-latest
-    name: Build for Windows (arm64,amd64)
+    name: Build for Windows
     env:
       DIST_OS: windows
       DIST_ARCH: arm64 amd64
@@ -19,24 +24,30 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
 
-      - name: Build project for distribution
+      - name: Build project
         run: make dist
 
-      - run: mv dist/*_arm64 ./taragen
-      - uses: actions/upload-artifact@v4
+      - name: Prepare arm64 artifact
+        run: mv dist/*_arm64 ./taragen
+
+      - name: Upload arm64 artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-windows-arm64
           path: taragen
 
-      - run: mv dist/*_amd64 ./taragen
-      - uses: actions/upload-artifact@v4
+      - name: Prepare amd64 artifact
+        run: mv dist/*_amd64 ./taragen
+
+      - name: Upload amd64 artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-windows-amd64
           path: taragen
 
   build-linux:
     runs-on: ubuntu-latest
-    name: Build for Linux (arm64,amd64)
+    name: Build for Linux
     env:
       DIST_OS: linux
       DIST_ARCH: arm64 amd64
@@ -50,17 +61,23 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           check-latest: true
 
-      - name: Build project for distribution
+      - name: Build project
         run: make dist
 
-      - run: mv dist/*_arm64 ./taragen
-      - uses: actions/upload-artifact@v4
+      - name: Prepare arm64 artifact
+        run: mv dist/*_arm64 ./taragen
+
+      - name: Upload arm64 artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-linux-arm64
           path: taragen
 
-      - run: mv dist/*_amd64 ./taragen
-      - uses: actions/upload-artifact@v4
+      - name: Prepare amd64 artifact
+        run: mv dist/*_amd64 ./taragen
+
+      - name: Upload amd64 artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-linux-amd64
           path: taragen
@@ -71,27 +88,11 @@ jobs:
     env:
       DIST_OS: darwin
       DIST_ARCH: arm64
-      AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
-      AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
-      AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
-      SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
-      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-
-      - name: Build project for distribution
-        run: |
-          make build
-          mv ./local/bin/taragen ./taragen
-
-      - name: Setup signing certificate
+      - name: Setup signing certificate and notarytool
         run: |
           echo "$SIGNING_CERTIFICATE" | base64 --decode > cert.p12
           security create-keychain -p "" build.keychain
@@ -99,25 +100,32 @@ jobs:
           security unlock-keychain -p "" build.keychain
           security import cert.p12 -k build.keychain -P "$SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-
-      - name: Sign
-        run: |
-          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
-      
-      - name: Prepare for notarization
-        run: zip taragen.zip taragen
-      
-      - name: Write API key file
-        run: |
           echo "$AC_PRIVATE_KEY" | base64 --decode > private_key.p8
           xcrun notarytool store-credentials --key private_key.p8 \
             --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" ac-profile
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build project
+        run: |
+          make build
+          mv ./local/bin/taragen ./taragen
+
+      - name: Sign
+        run: |
+          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
+
       - name: Notarize
         run: |
+          zip taragen.zip taragen
           xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-darwin-arm64
           path: taragen
@@ -128,27 +136,11 @@ jobs:
     env:
       DIST_OS: darwin
       DIST_ARCH: amd64
-      AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
-      AC_ISSUER_ID: ${{ secrets.AC_ISSUER_ID }}
-      AC_PRIVATE_KEY: ${{ secrets.AC_PRIVATE_KEY }}
-      SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
-      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          check-latest: true
-
-      - name: Build project for distribution
-        run: |
-          make build
-          mv ./local/bin/taragen ./taragen
-
-      - name: Setup signing certificate
+      - name: Setup signing certificate and notarytool
         run: |
           echo "$SIGNING_CERTIFICATE" | base64 --decode > cert.p12
           security create-keychain -p "" build.keychain
@@ -156,25 +148,32 @@ jobs:
           security unlock-keychain -p "" build.keychain
           security import cert.p12 -k build.keychain -P "$SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
-
-      - name: Sign
-        run: |
-          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
-      
-      - name: Prepare for notarization
-        run: zip taragen.zip taragen
-      
-      - name: Write API key file
-        run: |
           echo "$AC_PRIVATE_KEY" | base64 --decode > private_key.p8
           xcrun notarytool store-credentials --key private_key.p8 \
             --key-id "$AC_API_KEY_ID" --issuer "$AC_ISSUER_ID" ac-profile
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - name: Build project
+        run: |
+          make build
+          mv ./local/bin/taragen ./taragen
+
+      - name: Sign
+        run: |
+          codesign --timestamp --options runtime --sign "Developer ID Application" ./taragen
+
       - name: Notarize
         run: |
+          zip taragen.zip taragen
           xcrun notarytool submit taragen.zip --keychain-profile ac-profile --wait
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: taragen-darwin-amd64
           path: taragen
