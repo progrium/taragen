@@ -7,6 +7,4 @@ jobs:
     with:
       bin-name: taragen
       go-version: '1.23.1'
-      pre-build-script: |
-        echo "Hello, world!"
     secrets: inherit
