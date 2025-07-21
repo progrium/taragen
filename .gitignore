@@ -1,6 +1,6 @@
 .DS_Store
 /taragen
-/local
+/.local
 
 web/_public
 dist/

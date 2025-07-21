@@ -1,26 +1,27 @@
 # taragen!
 
+NAME		?= taragen
 VERSION 	?= v0.1-$(shell git rev-parse --short HEAD)
 GOARGS		?=
 GOOS		?= $(shell go env GOOS)
 GOARCH		?= $(shell go env GOARCH)
 BIN 		?= /usr/local/bin
-DIST_DIR	?= dist
+DIST_DIR	?= .local/dist
 DIST_OS		?= darwin windows linux
 DIST_ARCH	?= amd64 arm64
 
 
 ## Link binary to the bin directory
 link: build
-	rm -f $(BIN)/taragen
-	ln -s $(PWD)/local/bin/taragen $(BIN)/taragen
+	[ -f "$(BIN)/$(NAME)" ] && rm "$(BIN)/$(NAME)" || true
+	ln -fs "$(shell pwd)/.local/bin/$(NAME)" "$(BIN)/$(NAME)"
 .PHONY: link
 
 ## Build binary
 build:
 	go build -ldflags="-X main.Version=$(VERSION)" \
 		$(GOARGS) \
-		-o ./local/bin/taragen \
+		-o .local/bin/$(NAME) \
 		./cmd/taragen
 .PHONY: build
 
@@ -43,20 +44,6 @@ $(DIST_TARGETS): $(DIST_DIR)/%:
 ## Build distribution binaries
 dist: $(DIST_TARGETS)
 .PHONY: dist
-
-## Create zip archives for distribution
-archive: dist
-	@for file in $(DIST_DIR)/*; do \
-		if [ -f "$$file" ]; then \
-			zipfile="$${file}.zip"; \
-			tmpdir=$$(mktemp -d); \
-			mv "$$file" "$$tmpdir/taragen"; \
-			(cd "$$tmpdir" && zip "$(PWD)/$$zipfile" taragen); \
-			rm -rf "$$tmpdir"; \
-		fi \
-	done
-.PHONY: archive
-
 
 .DEFAULT_GOAL := show-help
 
