@@ -7,4 +7,5 @@ jobs:
     with:
       bin-name: taragen
       go-version: '1.23.1'
+      linux-386: true
     secrets: inherit
