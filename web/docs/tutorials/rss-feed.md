@@ -9,6 +9,7 @@ As you can see in the example, you need to explicitly set it to `layout = ""`, s
 In this example, we have a blog directory with a `feed.xml.jsx` file inside of it, with the following:
 
 ```
+
 data({
     preamble: '<?xml version="1.0" encoding="UTF-8" ?>',
     contentType: "application/rss+xml",

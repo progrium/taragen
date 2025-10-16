@@ -39,7 +39,7 @@ Inside `/blog`, create an `index.jsx` file for the homepage. Add the following:
 *Note the empty tags, because JSX requires a single outer element.*
 
 ```
-{{ safeHTML `<>
+<>
 	<h1>Blog</h1>
 	{pages("blog").filter(page => page.isDir).reverse().map(year => (
 		<div>
@@ -54,5 +54,5 @@ Inside `/blog`, create an `index.jsx` file for the homepage. Add the following:
 			</ul>
 		</div>
 	))}
-</> ` }}
+</>
 ```

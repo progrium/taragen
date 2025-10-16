@@ -120,7 +120,7 @@ Any extra arguments to the call to `partial` will be passed to the partial funct
 You can also use partials in Markdown using Go template syntax:
 
 ```
-{{ partial "_partial/nav" }}
+[[ "[[ partial \"_partial/nav\" ]]" ]]
 ```
 
 ## Globals

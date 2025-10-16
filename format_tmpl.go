@@ -2,28 +2,28 @@ package taragen
 
 import (
 	"bytes"
-	"html/template"
+	"text/template"
 )
 
 type TemplateParser struct{}
 
 func builtinFuncs(p *Page, content []byte) template.FuncMap {
 	return template.FuncMap{
-		"safeHTML": func(s string) template.HTML {
-			return template.HTML(s)
+		"safeHTML": func(s string) string {
+			return s
 		},
-		"content": func() template.HTML {
-			return template.HTML(string(content))
+		"content": func() string {
+			return string(content)
 		},
 		"page": func(key string) string {
 			return p.data[key].(string)
 		},
-		"partial": func(name string, args ...any) (template.HTML, error) {
+		"partial": func(name string, args ...any) (string, error) {
 			b, err := p.site.Partial(name, p.globals, args...)
 			if err != nil {
 				return "", err
 			}
-			return template.HTML(b), nil
+			return string(b), nil
 		},
 	}
 }
@@ -43,7 +43,7 @@ func (f *TemplateParser) Parse(p *Page) ([]byte, Data, error) {
 
 func RenderTemplate(name string, src []byte, funcs template.FuncMap) ([]byte, error) {
 	var buf bytes.Buffer
-	tmpl, err := template.New(name).Funcs(funcs).Parse(string(src))
+	tmpl, err := template.New(name).Funcs(funcs).Delims("[[", "]]").Parse(string(src))
 	if err != nil {
 		return nil, err
 	}
