@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Generated pages from bracketed templates
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Let one JSX file render many pages that have no source file of their own, such as month archives and tag listings.
