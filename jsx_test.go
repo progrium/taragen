@@ -179,3 +179,82 @@ func TestWrapJSX(t *testing.T) {
 		t.Error("expected an error for an unterminated data statement")
 	}
 }
+
+func TestJSXValues(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`<input n={3} f={1.5} on={true} off={false} empty="" u={undefined} z={null}/>`, `<input n="3" f="1.5" on/>`},
+		{`<p style={{color: "red", gone: null, also: undefined}}/>`, `<p style="color:red;"></p>`},
+		{`<p>{1}{2.5}{true}{false}{null}{undefined}</p>`, `<p>12.5</p>`},
+		{`<p>{[1, [2, "x"]]}</p>`, `<p>12x</p>`},
+		{`<p>{raw(null)}{raw(undefined)}{raw("<b/>")}</p>`, `<p><b/></p>`},
+		{`<p>{"a"}</p>`, `<p>a</p>`},
+	}
+	for _, tt := range tests {
+		got, err := RenderJSX("test", []byte(tt.input), nil)
+		if err != nil {
+			t.Errorf("%s: %v", tt.input, err)
+			continue
+		}
+		if string(got) != tt.expected {
+			t.Errorf("%s: expected %q, got %q", tt.input, tt.expected, string(got))
+		}
+	}
+}
+
+func TestJSXErrors(t *testing.T) {
+	for _, input := range []string{
+		`<p>{</p>`,
+		`throw new Error("boom")`,
+		`() => { throw new Error("boom") }`,
+		`<p>{[{a: 1}]}</p>`,
+	} {
+		if _, err := RenderJSX("bad", []byte(input), nil); err == nil {
+			t.Errorf("%s: expected an error", input)
+		}
+	}
+	if _, err := RenderJSX("bad", []byte(`<p/>`), map[string]any{"page": Data{}, "data": 1}); err != nil {
+		t.Errorf("globals should be able to replace data: %v", err)
+	}
+	if _, err := ExportJSX("bad", []byte(`var x = ;`), nil); err == nil {
+		t.Error("expected a syntax error from ExportJSX")
+	}
+}
+
+func TestWrapJSXScanning(t *testing.T) {
+	ok := []struct {
+		input    string
+		expected string
+	}{
+		// not a data call
+		{`dataset`, `<>dataset</>`},
+		{`data`, `<>data</>`},
+		{`// only a comment`, `<>// only a comment</>`},
+		{`/* unterminated`, `<>/* unterminated</>`},
+		// strings, escapes, and comments inside the call
+		{`data({a: 'x)\'y', b: "q\")"}) <p/>`, "data({a: 'x)\\'y', b: \"q\\\")\"});\n<><p/></>"},
+		{"data({a: `${ {b: \")\"}.b }`}) <p/>", "data({a: `${ {b: \")\"}.b }`});\n<><p/></>"},
+		{"data({a: 1, // )\n /* ) */ b: 2})\n<p/>", "data({a: 1, // )\n /* ) */ b: 2});\n<><p/></>"},
+	}
+	for _, tt := range ok {
+		got, err := wrapJSX([]byte(tt.input))
+		if err != nil {
+			t.Errorf("%q: %v", tt.input, err)
+			continue
+		}
+		if string(got) != tt.expected {
+			t.Errorf("%q: expected %q, got %q", tt.input, tt.expected, string(got))
+		}
+	}
+	for _, input := range []string{
+		`data({a: 1]`,
+		`data({a: "x})`,
+		"data({a: `${\"x}`})",
+	} {
+		if _, err := wrapJSX([]byte(input)); err == nil {
+			t.Errorf("%q: expected an error", input)
+		}
+	}
+}
