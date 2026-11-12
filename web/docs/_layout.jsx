@@ -22,6 +22,16 @@
         <section>
             <h1>{page.title}</h1>
             {content}
+            {page.backlinks.length > 0 &&
+                <aside class="backlinks">
+                    <h2>Linked from</h2>
+                    <ul>
+                        {page.backlinks.map(ref => (
+                            <li><a href={ref.path}>{ref.title || ref.path}</a></li>
+                        ))}
+                    </ul>
+                </aside>
+            }
         </section>
 
 </>

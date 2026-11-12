@@ -40,6 +40,14 @@ type Page struct {
 	// opt-out value read from page data
 	templates []*Output
 	optOut    any
+
+	// usesPages is set when pages() is called while the page parses, so
+	// ParseAll can parse it again once every page exists
+	usesPages bool
+	// links and backlinks are the page's place in the link graph, set by
+	// the link pass at the end of ParseAll and kept across re-parses
+	links     []any
+	backlinks []any
 }
 
 // URL returns the page's URL path, such as "/" or "/docs/intro".
@@ -216,6 +224,7 @@ func (p *Page) Parse() error {
 	// isn't read as an opt-out
 	p.data[Outputs] = map[string]any{}
 	p.outputs, p.templates, p.optOut = nil, nil, nil
+	p.usesPages = false
 
 	for _, suffix := range suffixes {
 		src, err = os.ReadFile(path.Join(p.site.dir, p.path+suffix))
@@ -259,6 +268,7 @@ func (p *Page) Parse() error {
 		return err
 	}
 	p.setOptOut(p.data[Outputs])
+	p.setGraphData()
 
 	body, data, err := f.Parse(p)
 	if err != nil {
@@ -277,6 +287,7 @@ func (p *Page) Parse() error {
 		p.outputs = enabledOutputs(p.templates, p.optOut)
 	}
 	p.data[Outputs] = outputsMap(p.outputs)
+	p.setGraphData()
 
 	return nil
 }
