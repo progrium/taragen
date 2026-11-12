@@ -35,6 +35,7 @@ type Page struct {
 	site    *Site
 	globals map[string]any
 	outputs []*Output // outputs that apply to the page and are turned on
+	aliases []string  // normalized aliases, as of the last parse
 
 	// set while parsing: the output templates that apply, and the outputs
 	// opt-out value read from page data
@@ -216,6 +217,7 @@ func (p *Page) Parse() error {
 	// isn't read as an opt-out
 	p.data[Outputs] = map[string]any{}
 	p.outputs, p.templates, p.optOut = nil, nil, nil
+	p.aliases = nil
 
 	for _, suffix := range suffixes {
 		src, err = os.ReadFile(path.Join(p.site.dir, p.path+suffix))
@@ -271,6 +273,9 @@ func (p *Page) Parse() error {
 	p.data[Body] = string(body)
 	if setByFrontmatter {
 		p.optOut = optOut
+	}
+	if err := p.normalizeAliases(); err != nil {
+		return err
 	}
 
 	if p.ContentType() == "text/html" {

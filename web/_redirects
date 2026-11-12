@@ -1,0 +1,4 @@
+# Redirects for hosts that read _redirects, and stubs for those that do not.
+# See docs/spec.md.
+/github      https://github.com/progrium/taragen  302
+/tutorials/* /docs/tutorials/:splat

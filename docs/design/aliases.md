@@ -1,12 +1,12 @@
 ---
 slug: aliases
 title: Aliases and redirects
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: [page-outputs]
 areas: [site, data, serve]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Aliases and redirects
@@ -204,18 +204,18 @@ Off-site targets are allowed only in `_redirects`, which the site author writes,
 
 ## Done criteria
 
-- [ ] `TestAliasStub`: a page with `aliases: [/old/path]` builds `_public/old/path/index.html` with the refresh, canonical link, fallback link, and `noindex`, pointing at the page's path.
-- [ ] `TestAliasDefaults`: an `articles/_defaults.jsx` deriving aliases from `page.path` gives every article and the `articles` index a stub under `/blog`, and bare directories get none.
-- [ ] `TestAliasNormalize`: trailing slashes are removed, a string becomes a list, duplicates are dropped, `page.aliases` holds the normalized list, and `..`, `//`, `?`, and relative paths fail the build.
-- [ ] `TestAliasEscaping`: a page path with `&` and `"` is escaped in the stub.
-- [ ] `TestAliasExtension`: `/old.html` is written as is; an alias of `feed.xml.jsx` gets a copy with the feed's content.
-- [ ] `TestAliasDrafts`: a draft's aliases are skipped in `build` and redirect in `serve`.
-- [ ] `TestAliasCollision`: an alias matching another page, another page's alias, a static file, an output, or a `_redirects` rule fails the build naming both.
-- [ ] `TestRedirectsFile`: `_redirects` is copied verbatim, a rule without a wildcard writes a stub (including to an off-site URL), and unsupported lines fail with the line number.
-- [ ] `TestRedirectsWildcard`: `/blog/* /articles/:splat` writes a stub for every built page under `/articles/`, skips paths already in the route table, and an off-site wildcard rule warns and writes nothing.
-- [ ] `TestServeRedirects`: `serve` sends a 301 for an alias, each rule's status for `_redirects` rules including wildcards, a copy for a feed alias, and picks up `_redirects` edits after a reload.
-- [ ] The progrium.xyz redesign's `articles/_defaults.jsx` one-liner keeps every old `/blog/<year>/<slug>` URL working after `taragen build`, checked by building the site and listing the stubs.
-- [ ] The spec describes `aliases`, `_redirects`, stubs, and their route table rows.
+- [x] `TestAliasStub`: a page with `aliases: [/old/path]` builds `_public/old/path/index.html` with the refresh, canonical link, fallback link, and `noindex`, pointing at the page's path.
+- [~] `TestAliasDefaults`: an `articles/_defaults.jsx` deriving aliases from `page.path` gives every article and the `articles` index a stub under `/blog`, and bare directories get none. Waived for the index only: `articles/index.jsx` is page `/articles`, whose directory is the root, so `articles/_defaults.jsx` doesn't apply to it (see the 2026-11-12 update). Every article gets its stub and bare directories get none.
+- [x] `TestAliasNormalize`: trailing slashes are removed, a string becomes a list, duplicates are dropped, `page.aliases` holds the normalized list, and `..`, `//`, `?`, and relative paths fail the build.
+- [x] `TestAliasEscaping`: a page path with `&` and `"` is escaped in the stub.
+- [x] `TestAliasExtension`: `/old.html` is written as is; an alias of `feed.xml.jsx` gets a copy with the feed's content.
+- [x] `TestAliasDrafts`: a draft's aliases are skipped in `build` and redirect in `serve`.
+- [x] `TestAliasCollision`: an alias matching another page, another page's alias, a static file, an output, or a `_redirects` rule fails the build naming both.
+- [x] `TestRedirectsFile`: `_redirects` is copied verbatim, a rule without a wildcard writes a stub (including to an off-site URL), and unsupported lines fail with the line number.
+- [x] `TestRedirectsWildcard`: `/blog/* /articles/:splat` writes a stub for every built page under `/articles/`, skips paths already in the route table, and an off-site wildcard rule warns and writes nothing.
+- [x] `TestServeRedirects`: `serve` sends a 301 for an alias, each rule's status for `_redirects` rules including wildcards, a copy for a feed alias, and picks up `_redirects` edits after a reload.
+- [x] The progrium.xyz redesign's `articles/_defaults.jsx` one-liner keeps every old `/blog/<year>/<slug>` URL working after `taragen build`, checked by building the site and listing the stubs.
+- [x] The spec describes `aliases`, `_redirects`, stubs, and their route table rows.
 
 ## Implementation
 
@@ -231,3 +231,8 @@ Off-site targets are allowed only in `_redirects`, which the site author writes,
 - Should stubs carry the URL fragment across with a one-line script, at the cost of stubs that aren't inert?
 - Should `_redirects` allow host-only lines (rewrites, `!`, conditions) behind an explicit marker, copied through but ignored by stubs and `serve`?
 - Should stubs use an absolute canonical URL? Taragen doesn't know the site's base URL today, so they use the path.
+
+## Updates
+
+- 2026-11-12: Implemented. `_defaults.jsx` applies to pages from the root down to the page's directory, and an index page's directory is its parent, so the `articles/_defaults.jsx` one-liner covers every article but not `/articles` itself; the redesign adds `aliases: /blog` to `articles/index.jsx` for that. A trial build of progrium.xyz with `blog/` moved to `articles/` wrote stubs for all 15 published `/blog/<year>/<slug>` posts and `/blog/archive`, a copy of the feed at `/blog/feed.xml`, and skipped the drafts.
+- 2026-11-12: Wildcard expansion uses the HTML page rows only, so `/blog/* /articles/:splat` doesn't copy `/articles/feed.xml` to `/blog/feed.xml`; an alias or a rule without a wildcard does that. Build prints `copied:` for alias and redirect copies and `redirect:` for stubs.
