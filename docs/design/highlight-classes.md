@@ -1,12 +1,12 @@
 ---
 slug: highlight-classes
 title: Code highlighting through CSS classes
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: []
 areas: [markdown]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Code highlighting through CSS classes
@@ -105,11 +105,11 @@ None. The change removes inline `style` attributes and adds fixed class names; t
 
 ## Done criteria
 
-- [ ] `TestMarkdownHighlightClasses`: a fenced Go block renders with `<pre class="chroma">`, `<code class="language-go">`, and token spans with classes, and the output has no `style=` attribute.
-- [ ] `TestMarkdownHighlightUnknownLanguage`: a fenced block in an unknown language, a fenced block with no language, and an indented block render as plain `<pre><code>`, with `language-<lang>` only when a language was given.
-- [ ] `TestMarkdownHighlightEscapes`: a block containing `<`, `&`, and `"` is escaped inside token spans.
-- [ ] Demo: `taragen build` on `web/` has no `style=` attribute in any `pre` in `_public/`, and the docs pages show highlighted code with the site's CSS.
-- [ ] The spec's Markdown section describes the markup and the class contract, and links Chroma's token class list.
+- [x] `TestMarkdownHighlightClasses`: a fenced Go block renders with `<pre class="chroma">`, `<code class="language-go">`, and token spans with classes, and the output has no `style=` attribute.
+- [x] `TestMarkdownHighlightUnknownLanguage`: a fenced block in an unknown language, a fenced block with no language, and an indented block render as plain `<pre><code>`, with `language-<lang>` only when a language was given.
+- [x] `TestMarkdownHighlightEscapes`: a block containing `<`, `&`, and `"` is escaped inside token spans.
+- [x] Demo: `taragen build` on `web/` has no `style=` attribute in any `pre` in `_public/`, and the docs pages show highlighted code with the site's CSS.
+- [x] The spec's Markdown section describes the markup and the class contract, and links Chroma's token class list.
 
 ## Implementation
 
@@ -118,6 +118,6 @@ None. The change removes inline `style` attributes and adds fixed class names; t
 3. Add highlighting rules to `web/_assets/styles/style.css`.
 4. Update the Markdown section of the spec.
 
-## Open issues
+## Updates
 
-- Should the spec copy a short table of the most common class names, or only link Chroma's list? This draft does both: a few names in the spec, the full list by link.
+2026-11-12: Implemented. The open issue was settled as drafted: the spec has a short table of common class names and links Chroma's full token table. Line spans keep Chroma's `hl` class when a block uses the `hl_lines` attribute. The example site's docs had no languages on their fences, so they were tagged (`jsx`, `html`, `css`, `sh`, `yaml`) to show highlighting.

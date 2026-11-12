@@ -5,7 +5,7 @@ title: Getting Started
 ## Install
 
 To install with Homebrew, run:
-```
+```sh
 brew tap progrium/homebrew-taps
 brew install taragen
 ```
@@ -23,7 +23,7 @@ brew install taragen
 
 Create a directory for your site. From that directory, create an index.jsx file with simple HTML:
 
-```
+```html
 <html>
     <body>
         <h1>Hello World</h1>
@@ -32,7 +32,7 @@ Create a directory for your site. From that directory, create an index.jsx file 
 ```
 
 Then run:
-```
+```sh
 taragen serve
 ```
 
@@ -50,7 +50,7 @@ Layouts are partials that take a single `content` argument and by convention liv
 
 In this example, we’re going to make a layout for a specific page. We have an `/about` directory with an `index.jsx`. We’ll add a `_layout.jsx` file to the `/about` directory. Since a layout is technically a special partial, the file should define a JavaScript function like partials. However, there will always only be the one `content` argument.
 
-```
+```jsx
 (content) => {
 	title = "About";
 	return (
@@ -67,7 +67,7 @@ In this example, we’re going to make a layout for a specific page. We have an 
 
 You can prevent a page from having the directory layout applied, as well as explicitly set the layout for a page, by specifying a `layout` field in the page data. An empty value means no layout. Any other value should be a path to a layout partial file relative to the root and without file extension.
 
-```
+```yaml
 ---
 layout: about/_alternative_layout
 ---
@@ -76,7 +76,7 @@ Markdown content.
 
 The `layout` data field can also be set in layouts themselves using `data({ ... });` as the first statement of the layout. It must end with the semi-colon.
 
-```
+```jsx
 data({
     layout: "about/_alternative_layout"
 });
@@ -90,7 +90,7 @@ data({
 Partials are functions that return reusable JSX and can be called in pages, layouts, and other partials. Any JSX. Partials are defined in partial files, which are typically named prefixed with an underscore so they are ignored as pages.
 
 Since partials are functions, even if you have no arguments you still need the minimal syntax to define a function by beginning the partial file like so:
-```
+```jsx
 () =>
 ```
 
@@ -100,7 +100,7 @@ Note: The partial file doesn't need to start with an underscore if it is in a di
 
 In a top-level `/_partials` directory, add a `nav.jsx` file with:
 
-```
+```jsx
 () =>
 <ul>
 	<li><a href="/">Home</a></li>
@@ -111,7 +111,7 @@ In a top-level `/_partials` directory, add a `nav.jsx` file with:
 
 To reference the partial in JSX:
 
-```
+```jsx
  {partial("_partials/nav")}
 ```
 
@@ -129,7 +129,7 @@ Text and attribute values in JSX are HTML-escaped, so a title like `Tips & Trick
 
 Partials and the `content` a layout receives are already HTML, so they are inserted as is. Any other HTML string, such as another page's `body` from `pages()`, needs `raw()` to be inserted unescaped:
 
-```
+```jsx
 <div class="excerpt">{raw(post.body)}</div>
 ```
 
@@ -145,13 +145,13 @@ Typically there is just one globals file in the root, but any directory with a `
 
 Create a `_globals.jsx` file with the following content:
 
-```
+```jsx
 siteName = "My Site"
 ```
 
 In your `index.jsx` file, use the `siteName` variable. It will have the value set in the globals file.
 
-```
+```jsx
 <html>
     <body>
         <h1>{siteName}</h1>

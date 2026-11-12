@@ -3,6 +3,7 @@ module github.com/progrium/taragen
 go 1.23.1
 
 require (
+	github.com/alecthomas/chroma v0.10.0
 	github.com/dop251/goja v0.0.0-20250125213203-5ef83b82af17
 	github.com/evanw/esbuild v0.24.2
 	github.com/gorilla/websocket v1.5.3
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/alecthomas/chroma v0.10.0 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect

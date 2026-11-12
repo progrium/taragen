@@ -33,7 +33,7 @@ Both commands operate on the current working directory as the site root.
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
-| `format_md.go` | Markdown parser (template pass, then goldmark with syntax highlighting). |
+| `format_md.go` | Markdown parser (template pass, then goldmark with class-based syntax highlighting). |
 | `format_tmpl.go` | Go `text/template` parser, template helper funcs, `RenderTemplate`. |
 | `jsx.go` | JSX runtime: esbuild transform, goja VM setup, `hyper` element factory, HTML serialization. |
 | `reloader.go` | File watcher and WebSocket-based live reload. |
@@ -219,6 +219,44 @@ Markdown first goes through the Go template parser (so frontmatter is extracted
 and `[[ ... ]]` template actions run), then through goldmark with the
 `goldmark-highlighting` (Chroma) extension. Raw HTML is allowed
 (`html.WithUnsafe()`).
+
+Code highlighting uses CSS classes, never inline styles, so the site's
+stylesheet decides how code looks. A fenced block whose language Chroma
+recognizes renders as:
+
+```html
+<pre tabindex="0" class="chroma"><code class="language-go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> ...
+</span></span></code></pre>
+```
+
+- `<pre>` has `class="chroma"` and `tabindex="0"`; `<code>` has
+  `class="language-<lang>"`, with the info string's first word as written.
+- Each line is a `span.line` wrapping a `span.cl`. Each token is a `span`
+  whose class is Chroma's short name for its token type; plain text gets no
+  span. No element produced by highlighting has a `style` attribute.
+- Fenced blocks in a language Chroma doesn't know, fenced blocks with no
+  language, indented blocks, and inline code are plain `<pre><code>` (with
+  `class="language-<lang>"` when a language was given) and escaped text.
+  Taragen doesn't guess languages.
+
+The class names are Chroma's and are the public contract, the same ones Hugo
+emits, so any Chroma stylesheet works unchanged (for example from
+`hugo gen chromastyles`). Taragen ships and injects no highlighting CSS. Common
+classes:
+
+| Class | Token |
+| --- | --- |
+| `k`, `kd`, `kn`, `kc`, `kt` | Keyword, declaration, namespace, constant, type keyword |
+| `nf`, `nt`, `na`, `nb` | Function, tag, attribute, and builtin names |
+| `s`, `s1`, `s2`, `se` | Strings (generic, single, double quoted) and escapes |
+| `m`, `mi`, `mf` | Numbers |
+| `c`, `c1`, `cm` | Comments (generic, single line, multiline) |
+| `o`, `p` | Operators and punctuation |
+| `line`, `cl`, `hl` | Line wrapper, line content, highlighted line |
+
+The full list is Chroma's token table:
+<https://github.com/alecthomas/chroma/blob/v0.10.0/types.go>. The example site's
+`web/_assets/styles/style.css` has a small palette for its brown `pre`.
 
 ### Go templates
 
