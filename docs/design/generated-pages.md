@@ -1,12 +1,12 @@
 ---
 slug: generated-pages
 title: Generated pages from bracketed templates
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: [page-outputs]
 areas: [site, data, jsx, serve]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Generated pages from bracketed templates
@@ -181,22 +181,22 @@ Generated paths are built from site code, so their values are validated as singl
 
 ## Done criteria
 
-- [ ] `TestGeneratedTag`: `tags/[tag].jsx` with params from page tags builds one `tags/<tag>/index.html` per tag, each seeing its own `page.params.tag`.
-- [ ] `TestGeneratedNested`: `logs/[year]/[month].jsx` builds `/logs/2026/11` and `/logs/2026/10` from dated logs, with `slug` set to the month.
-- [ ] `TestGeneratedFillsDir`: `logs/[year]/index.jsx` fills the bare `logs/2026/` directory, and `pages("logs/2026")` from it still lists the real logs.
-- [ ] `TestGeneratedMissingParent`: a generated `/logs/2027/01` with no `logs/2027/` on disk gets a bare directory page that `pages("logs/*")` reaches.
-- [ ] `TestGeneratedRealWins`: a real `tags/plan9.md` replaces the generated `/tags/plan9` without an error.
-- [ ] `TestGeneratedCollision`: two templates producing one path fail `build` naming both; a generated path matching a static file fails naming both.
-- [ ] `TestGeneratedParamsRealOnly`: `pages()` inside `params` returns no generated pages, and `pages()` in a page body at render time does.
-- [ ] `TestGeneratedDrafts`: a month holding only a draft log gets no page in `build` and gets one in `serve`; a template setting `draft: true` is skipped by `build`.
-- [ ] `TestGeneratedParamErrors`: a missing key, an extra key, a value with `/`, a value of `..`, and a value starting with `_` each fail the build naming the template.
-- [ ] `TestGeneratedBadNames`: `[year]-archive.jsx`, `tags/[tag].md`, and a static file inside `logs/[year]/` each fail the build.
-- [ ] `TestGeneratedDedupe`: repeated identical sets produce one page, and an empty array produces none.
-- [ ] `TestGeneratedOutputs`: with `_outputs/txt.jsx`, a generated page gets `page.outputs.txt` and its `.txt` file is built.
-- [ ] `TestGeneratedLayouts`: a generated page is wrapped by the layouts and gets the defaults found along its generated path.
-- [ ] `TestServeGenerated`: `serve` renders `/tags/<tag>` on request, returns the disk fallthrough for an unknown tag, and picks up a new tag added to a Markdown file after a reload.
-- [ ] The `web/` site adds a generated page, such as tag pages for the docs, and `make web-build` writes it.
-- [ ] The spec describes templates, `params()`, `page.params`, the two-pass `ParseAll`, and the collision rules.
+- [x] `TestGeneratedTag`: `tags/[tag].jsx` with params from page tags builds one `tags/<tag>/index.html` per tag, each seeing its own `page.params.tag`.
+- [x] `TestGeneratedNested`: `logs/[year]/[month].jsx` builds `/logs/2026/11` and `/logs/2026/10` from dated logs, with `slug` set to the month.
+- [x] `TestGeneratedFillsDir`: `logs/[year]/index.jsx` fills the bare `logs/2026/` directory, and `pages("logs/2026")` from it still lists the real logs.
+- [x] `TestGeneratedMissingParent`: a generated `/logs/2027/01` with no `logs/2027/` on disk gets a bare directory page that `pages("logs/*")` reaches.
+- [x] `TestGeneratedRealWins`: a real `tags/plan9.md` replaces the generated `/tags/plan9` without an error.
+- [x] `TestGeneratedCollision`: two templates producing one path fail `build` naming both; a generated path matching a static file fails naming both.
+- [x] `TestGeneratedParamsRealOnly`: `pages()` inside `params` returns no generated pages, and `pages()` in a page body at render time does.
+- [x] `TestGeneratedDrafts`: a month holding only a draft log gets no page in `build` and gets one in `serve`; a template setting `draft: true` is skipped by `build`.
+- [x] `TestGeneratedParamErrors`: a missing key, an extra key, a value with `/`, a value of `..`, and a value starting with `_` each fail the build naming the template.
+- [x] `TestGeneratedBadNames`: `[year]-archive.jsx`, `tags/[tag].md`, and a static file inside `logs/[year]/` each fail the build.
+- [x] `TestGeneratedDedupe`: repeated identical sets produce one page, and an empty array produces none.
+- [x] `TestGeneratedOutputs`: with `_outputs/txt.jsx`, a generated page gets `page.outputs.txt` and its `.txt` file is built.
+- [x] `TestGeneratedLayouts`: a generated page is wrapped by the layouts and gets the defaults found along its generated path.
+- [x] `TestServeGenerated`: `serve` renders `/tags/<tag>` on request, returns the disk fallthrough for an unknown tag, and picks up a new tag added to a Markdown file after a reload.
+- [x] The `web/` site adds a generated page, such as tag pages for the docs, and `make web-build` writes it.
+- [x] The spec describes templates, `params()`, `page.params`, the two-pass `ParseAll`, and the collision rules.
 
 ## Implementation
 
@@ -211,3 +211,8 @@ Generated paths are built from site code, so their values are validated as singl
 
 - Should `_layout.jsx`, `_defaults.jsx`, and `_outputs/` be allowed inside a bracketed directory, applying to every page generated under it? This proposal makes them errors and looks layouts up along the generated path, which covers the redesign.
 - Should `pages()` take an option to leave generated pages out, instead of filtering on `params`? Filtering is one line, so this proposal adds nothing.
+
+## Updates
+
+- 2026-11-12: Implemented. The month example under `params()`, and the same one in MANUAL.md, needs one change to run: at render time `pages("logs/*")` also returns the generated month pages, which have no `date`, so its body filter calls `startsWith` on undefined. Filtering with `!l.params &&` first fixes it, and `TestGeneratedNested` does that. The design is unchanged.
+- 2026-11-12: A leading `params(...)` call is turned into a `void` expression when a template renders, so the `params` global can throw for every call that reaches the VM. This is how a call outside the leading statements, or in a layout or partial, fails.

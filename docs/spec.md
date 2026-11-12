@@ -32,9 +32,10 @@ Both commands operate on the current working directory as the site root.
 | `site.go` | `Site`: directory walking, page registry, static build, HTTP handler, partial loading. |
 | `routes.go` | `RouteTable`: every URL the site serves and the page, output, or static file that produces it. |
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
+| `generated.go` | Templates with bracketed parameters: `params()` evaluation, value checks, and registering generated pages. |
 | `outputs.go` | `Output`: `_outputs/` template lookup, opt-outs, `page.outputs`, and output rendering. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
-| `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
+| `format_jsx.go` | JSX page parser, leading statement scanning, and the built-in JS globals (`page`, `partial`, `pages`, `params`). |
 | `query.go` | `pages()` queries: pattern matching with `**`, the object form with `where`, and the listing order. |
 | `format_md.go` | Markdown parser (template pass, then goldmark with syntax highlighting). |
 | `format_tmpl.go` | Go `text/template` parser, template helper funcs, `RenderTemplate`. |
@@ -54,6 +55,9 @@ Both commands operate on the current working directory as the site root.
 A `Site` is rooted at a directory. `Site.walk` traverses it with these rules:
 
 - Names starting with `.` are skipped (directories are pruned).
+- A path segment written as `[name]` is a parameter, and a page source under
+  one is a template (see Generated pages). Templates aren't pages, and
+  bracketed directories are walked but aren't pages either.
 - Names starting with `_` are skipped (directories are pruned). This is how
   layouts, partials, globals, defaults, output templates, and assets stay out
   of the page tree.
@@ -106,13 +110,14 @@ built-in meaning:
 | `contentType` | Defaults to `text/html`; served as the HTTP `Content-Type`. |
 | `preamble` | Text written before the output; defaults to `<!DOCTYPE html>` for HTML. |
 | `outputs` | Set by taragen to a map from output name to URL (see Outputs). A page sets it to `false`, or to a map with `false` entries, to turn outputs off. |
+| `params` | A generated page's parameter set, as strings, such as `{year: "2026", month: "11"}` (seeded). Only generated pages have it. |
 
 Any other keys (`title`, `description`, ...) are free-form and flow through to
 JSX and templates untouched.
 
 Data is populated in this order, later writers winning:
 
-1. Seeded `path` and `slug`.
+1. Seeded `path` and `slug`, and `params` on generated pages.
 2. `_defaults.jsx` files from the root down to the page's directory.
 3. Format-specific data: YAML frontmatter for Markdown and templates, or calls to
    `data({...})` in JSX.
@@ -125,6 +130,53 @@ Data is populated in this order, later writers winning:
 the future. A draft's outputs are drafts too. `build` always skips drafts. `serve` constructs the site with
 `drafts=true`, so drafts are still rendered and included in `pages()` listings.
 `Subpages()` filters drafts only when the site is not in drafts mode.
+
+### Generated pages
+
+A page source whose file name (before its extensions) is a parameter like
+`[tag]`, or that sits under a directory named like `[year]`, is a template.
+Its URL pattern is its normalized page path, such as `logs/[year]/[month]` for
+`logs/[year]/[month].jsx` or `logs/[year]` for `logs/[year]/index.jsx`. A
+parameter name is a lowercase letter followed by lowercase letters and digits,
+and appears at most once in a path.
+
+`walk` fails the build on a segment that has brackets but isn't exactly
+`[name]` (like `[year]-archive.jsx`), a template that isn't `.jsx`, and any
+static file or `_`-prefixed name inside a bracketed directory.
+
+A template's leading statements must include exactly one `params(...)` call.
+Its argument is an array of parameter sets, or a function with no arguments
+returning one. Each set is an object with exactly the template's parameter
+names as keys and string or number values (numbers become strings as JS prints
+them). A value must be a non-empty single path segment: no `/` or `\`, not
+`.` or `..`, and not starting with `.` or `_`. A bad set fails the build naming
+the template and the set's index. Identical sets are merged, and an empty array
+generates nothing.
+
+`ParseAll` runs in two passes. After `walk` has parsed every real page, each
+template, in sorted source path order, has only its `params(...)` statement run
+in a fresh VM with the globals from its real ancestor directories and the
+built-in `pages()`, and with `page` undefined. `pages()` there sees only real
+pages, so one template's output can't feed another's, and it applies the site's
+draft mode, so in `build` a month holding only drafts gets no page. Each set
+fills the pattern into a page path, and then:
+
+- Two templates producing the same path fail the build, naming both.
+- A real page source at the path wins, and the generated page is dropped
+  without an error.
+- A bare directory at the path is replaced by the generated page, which keeps
+  its subpages.
+- A generated page whose parent directories have no page gets bare directory
+  pages for them, so listings reach it.
+
+The generated pages are then parsed from their template's source. Their data
+seeds `path`, `slug` (the last segment of the page path), and `params`; `src`
+is the template's source and `isDir` is set for an `index.jsx` template.
+Globals, defaults, layouts, and output templates are found along the generated
+page path, as for a real source there. Generated pages are in `pages()`
+listings at render time, identifiable by their `params` key, and become page
+routes, so `build`, `serve`, and outputs treat them like any other page. A
+generated page whose data makes it a draft is skipped by `build`.
 
 ## Formats
 
@@ -191,11 +243,13 @@ no component state. JSX is purely a templating language here.
 
 **Page wrapping.** `JSXParser` wraps page sources in a `<>...</>` fragment so a
 page can have multiple root elements or start with a bare `{partial(...)}`
-expression. If the first statement (after whitespace and comments) is a
-`data(...)` call, it is kept outside the fragment. Its end is found by matching
-parentheses while skipping strings, template literals, and comments, and a
-trailing `;` is optional. Pages that mention `data` anywhere else are wrapped
-whole.
+expression. Leading `data(...)` and `params(...)` calls (after whitespace and
+comments, in any order) are kept outside the fragment, in source order. Each
+call's end is found by matching parentheses while skipping strings, template
+literals, and comments, and a trailing `;` is optional. Pages that mention
+`data` anywhere else are wrapped whole. A leading `params(...)` call is turned
+into a `void` expression, since it does nothing when a template renders, and a
+page that isn't a template fails to parse if it has one.
 
 **`data()`.** When the globals include `page`, `RenderJSX` installs a `data(obj)`
 function that merges `obj` into both the JS `page` object and the Go page `Data`
@@ -219,6 +273,9 @@ Built-in globals, added after user globals so they always win:
   in every JSX VM, including layouts and partials.
 - `pages(query)`: returns page data objects (each with a recursive `subpages`
   array), sorted as one listing (see Ordering). See Page queries below.
+- `params(sets)`: declares a template's parameter sets (see Generated pages).
+  It is only read as a template's leading statement; any call that runs in a
+  page body, layout, or partial throws.
 
 ### Page queries
 
@@ -289,8 +346,10 @@ having no frontmatter.
 
 `Page.Parse()`:
 
-1. Try each format extension as `<path><ext>`, then `<path>/index<ext>`. The
-   first file found wins; an `index` hit sets `isDir`.
+1. A generated page reads its template's source, sets `isDir` for an
+   `index.jsx` template, and seeds `params`. Any other page tries each format
+   extension as `<path><ext>`, then `<path>/index<ext>`. The first file found
+   wins; an `index` hit sets `isDir`.
 2. If no source is found but the path is a directory, mark it `isDir` and stop.
 3. Load globals: collect `_globals.jsx` files from the root down to the page's
    directory, run each in order with the accumulated globals so far, then add the
@@ -404,7 +463,7 @@ to the one thing that produces it. Each `Route` has a kind, a URL, and the file
 | `output` | `/about.txt` | `about.txt` |
 | `static` | `/img/logo.svg`, `/_assets/style.css` | the same path |
 
-Pages with a source are page routes, written to `<path>/index.html` when the
+Pages with a source, and generated pages, are page routes, written to `<path>/index.html` when the
 page path has no extension (and for the root), and as-is otherwise. Bare
 directories have no route. Static routes are the non-page files `walk` finds
 plus the files under the root `_assets/` directory.
@@ -412,7 +471,9 @@ plus the files under the root `_assets/` directory.
 Lookups ignore leading and trailing slashes, so `/about` and `/about/` are the
 same route. Two routes with the same URL or the same file fail `ParseAll`
 with an error naming both producers, such as an output `foo.txt` and a static
-file `foo.txt`, or a page `foo` and a static `foo/index.html`. Drafts stay in
+file `foo.txt`, or a page `foo` and a static `foo/index.html`. A generated page
+is named with its template, so a generated `/a/one` colliding with a static
+`a/one/index.html` names `a/[x].jsx`. Drafts stay in
 the table; `Route.Draft()` reports whether the route's page is a draft, and
 each mode applies its own draft rule. `Site.Routes()` returns the table from the
 last `ParseAll`.
@@ -435,8 +496,8 @@ pages at the end.
 `taragen build` calls `NewSite(cwd, false).GenerateAll("_public", true)`:
 
 1. `ParseAll()` resets the page map, parses every page path found by `walk`
-   once each (a directory and its `index.*` file share one), and builds the
-   route table. A route collision stops the build.
+   once each (a directory and its `index.*` file share one), generates and
+   parses the pages for every template, and builds the route table. A route collision stops the build.
 2. **Clean.** With `clobber` set, every entry in the destination is removed
    except dot-prefixed entries at its top level, so a checked-out deploy
    repository (`_public/.git`) survives. Renamed and deleted pages don't linger.
@@ -461,6 +522,9 @@ parses everything, and serves on port 8088 (hard-coded). `Site.ServeHTTP`:
   lookup and render run under the site mutex, the same one `ParseAll` takes, so
   a reload during a request can't race. A render error is a 500 with the error
   text.
+- Generated pages are in the table, so they render on request like real
+  pages. A path that fills a template's pattern but isn't in the table, like
+  `/tags/nosuchtag`, falls through to disk.
 - Paths not in the table are served from disk with `http.ServeFile`. Because
   this bypasses `walk`, underscore paths are reachable in serve mode, and a
   bare directory gets a directory listing.
@@ -542,8 +606,9 @@ where noted.
   Go 1.23.1 and an extra linux-386 target.
 - Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`,
   the page tests in `page_test.go`, the output and route table tests in
-  `outputs_test.go`, the build, serve, and watcher tests in `site_test.go` and
-  `serve_test.go`, and the design tooling tests.
+  `outputs_test.go`, the generated page tests in `generated_test.go`, the
+  build, serve, and watcher tests in `site_test.go` and `serve_test.go`, and
+  the design tooling tests.
 
 ## Design process tooling
 

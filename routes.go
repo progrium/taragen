@@ -12,7 +12,8 @@ import (
 type RouteKind string
 
 const (
-	// RoutePage is a page with a source file.
+	// RoutePage is a page with a source file, or a page generated from a
+	// template.
 	RoutePage RouteKind = "page"
 	// RouteOutput is an output of a page, from an _outputs template.
 	RouteOutput RouteKind = "output"
@@ -47,6 +48,9 @@ func (r *Route) Draft() bool {
 func (r *Route) String() string {
 	switch r.Kind {
 	case RoutePage:
+		if r.Page.template != "" {
+			return fmt.Sprintf("generated page %s (%s)", r.URL, r.Page.template)
+		}
 		return fmt.Sprintf("page %s (%s)", r.URL, r.Page.file)
 	case RouteOutput:
 		return fmt.Sprintf("output %s of page %s (%s)", r.Output.Name, r.Page.URL(), r.Output.Template)
