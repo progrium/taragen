@@ -83,7 +83,7 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 	if err != nil {
 		return nil, Data{}, err
 	}
-	out, err = RenderJSX(p.path, src, p.globals)
+	out, err = renderJSX(p.path, src, p.globals, p.onData)
 	if err != nil {
 		fmt.Printf("error source: %s: %s\n", p.path, string(src))
 		return

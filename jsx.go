@@ -40,6 +40,12 @@ func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
 }
 
 func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]byte, error) {
+	return renderJSX(name, src, globals, nil, args...)
+}
+
+// renderJSX is RenderJSX with onData, if set, called after each data() call
+// with the values it merged into the page.
+func renderJSX(name string, src []byte, globals map[string]any, onData func(map[string]any), args ...any) ([]byte, error) {
 	vm, jsCode, err := setupJSX(name, replacePreNewlines(src))
 	if err != nil {
 		return nil, err
@@ -54,6 +60,9 @@ func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]
 			for k, v := range data {
 				vm.Get("page").ToObject(vm).Set(k, v)
 				page[k] = v
+			}
+			if onData != nil {
+				onData(data)
 			}
 			return nil
 		}); err != nil {

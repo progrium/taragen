@@ -1,12 +1,12 @@
 ---
 slug: page-outputs
 title: Extra output files per page
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: []
 areas: [site, data, jsx, serve]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Extra output files per page
@@ -182,19 +182,19 @@ Output URLs are derived from page paths and template file names, both of which a
 
 ## Done criteria
 
-- [ ] `TestOutputTxt`: a site with `_outputs/txt.jsx` builds `about.txt` and `index.txt` with the template's string output, verbatim.
-- [ ] `TestOutputSuffix`: `_outputs/card.png.jsx` produces `about.card.png`, keyed `card` in `page.outputs`.
-- [ ] `TestOutputNearestWins`: `logs/_outputs/txt.jsx` overrides the root template for pages under `logs/` only.
-- [ ] `TestOutputOptOut`: `outputs: { txt: false }` and `outputs: false` in frontmatter, and in a `_defaults.jsx`, remove the files and the map entries.
-- [ ] `TestOutputSkips`: drafts, bare directories, and non-HTML pages like `feed.xml.jsx` get no outputs in `build`; drafts' outputs are served by `serve`.
-- [ ] `TestOutputsMap`: `page.outputs` is visible to the page's own layout during render and in `pages()` results from another page.
-- [ ] `TestOutputContentType`: the default content type comes from the suffix, `data({contentType})` overrides it, and `serve` sends it.
-- [ ] `TestOutputDataIsolated`: `data()` in an output template doesn't change the page's data.
-- [ ] `TestRouteCollision`: an output URL that matches a static file or another page fails `build` with both producers named.
-- [ ] `TestRouteSingleRender`: a directory with an `index.jsx` renders once in `build`.
-- [ ] `TestServeOutput`: `serve` renders `/about.txt` on request, injects no live reload script into it, and reflects template edits after a reload.
-- [ ] The `web/` site adds `_outputs/txt.jsx` and a footer link to `page.outputs.txt`, and `make web-build` writes the `.txt` files.
-- [ ] The spec describes output templates, `page.outputs`, and the route table.
+- [x] `TestOutputTxt`: a site with `_outputs/txt.jsx` builds `about.txt` and `index.txt` with the template's string output, verbatim.
+- [x] `TestOutputSuffix`: `_outputs/card.png.jsx` produces `about.card.png`, keyed `card` in `page.outputs`.
+- [x] `TestOutputNearestWins`: `logs/_outputs/txt.jsx` overrides the root template for pages under `logs/` only.
+- [x] `TestOutputOptOut`: `outputs: { txt: false }` and `outputs: false` in frontmatter, and in a `_defaults.jsx`, remove the files and the map entries.
+- [x] `TestOutputSkips`: drafts, bare directories, and non-HTML pages like `feed.xml.jsx` get no outputs in `build`; drafts' outputs are served by `serve`.
+- [x] `TestOutputsMap`: `page.outputs` is visible to the page's own layout during render and in `pages()` results from another page.
+- [x] `TestOutputContentType`: the default content type comes from the suffix, `data({contentType})` overrides it, and `serve` sends it.
+- [x] `TestOutputDataIsolated`: `data()` in an output template doesn't change the page's data.
+- [x] `TestRouteCollision`: an output URL that matches a static file or another page fails `build` with both producers named.
+- [x] `TestRouteSingleRender`: a directory with an `index.jsx` renders once in `build`.
+- [x] `TestServeOutput`: `serve` renders `/about.txt` on request, injects no live reload script into it, and reflects template edits after a reload.
+- [x] The `web/` site adds `_outputs/txt.jsx` and a footer link to `page.outputs.txt`, and `make web-build` writes the `.txt` files.
+- [x] The spec describes output templates, `page.outputs`, and the route table.
 
 ## Implementation
 
@@ -209,3 +209,14 @@ Output URLs are derived from page paths and template file names, both of which a
 
 - Should output templates also be allowed as `.tmpl`, like layouts? JSX covers the redesign, so this proposal leaves it out.
 - Should an output be able to return bytes (a `Uint8Array`) for binary formats? Share cards would rasterize in Go instead, so this is deferred to that proposal.
+
+## Updates
+
+Nov 12, 2026: Implemented. Notes on details the proposal left open:
+
+- Bare directories have no route, so `serve` no longer renders them as an empty page through the layouts; the request falls through to `http.ServeFile`, as `build` already wrote nothing for them.
+- Files under the root `_assets/` are static routes, so they are checked for collisions like any other file.
+- A route collides on its URL or on the file `build` writes, so a page `foo` and a static `foo/index.html` are an error too.
+- A `data()` call in a JSX page body that sets `outputs` is applied at once, so the body's own later reads of `page.outputs` see the map of URLs and not the opt-out.
+- An output template name that isn't a lowercase word, or two templates with the same name in one `_outputs/`, fails the parse.
+- Output errors name the output and its page, such as `output txt of /about`.
