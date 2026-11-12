@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Aliases and redirects
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Let a page list the old URLs it used to live at, as `aliases` in its data, and let a site list other redirects in a root `_redirects` file in Netlify's format.
