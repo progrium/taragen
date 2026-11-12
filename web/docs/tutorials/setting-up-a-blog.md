@@ -12,7 +12,7 @@ We recommend grouping posts by date, so create a directory inside blog for the c
 Inside the current year, create a file called `post-title.md` with the following format:
 
 
-```
+```yaml
 ---
 title: "Your Title"
 date: 2025-01-01
@@ -25,7 +25,7 @@ content
 	
 Inside the `blog/_layout.jsx` file, add the following:
 
-```
+```jsx
 (content) =>
     <div class="blog">
     <main>
@@ -39,7 +39,7 @@ Inside `/blog`, create an `index.jsx` file for the homepage. Add the following:
 
 *Note the empty tags, because JSX requires a single outer element.*
 
-```
+```jsx
 <>
 	<h1>Blog</h1>
 	{pages("blog").filter(page => page.isDir).reverse().map(year => (

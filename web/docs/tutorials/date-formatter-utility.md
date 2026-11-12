@@ -4,7 +4,7 @@ tags: [jsx]
 ---
 
 Add the following to your `_globals.jsx` file:
-```
+```jsx
 formatDate = (date, format) => {
 	const map = {
 		'MM': date.getMonth() + 1,
@@ -20,7 +20,7 @@ formatDate = (date, format) => {
 ```
 
 Now on one of your JSX pages, you can do:
-```
+```jsx
 <p>{formatDate(new Date(), 'MM/dd/yyyy')}</p>
 ```
 

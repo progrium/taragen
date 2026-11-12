@@ -189,6 +189,17 @@ code:not(pre>code) {
   font-weight: 800;
 }
 
+/* Code highlighting: taragen marks tokens with Chroma's class names. */
+.chroma .c, .chroma .c1, .chroma .cm, .chroma .cs { color: oklch(0.72 0.03 46.61); font-style: italic; }
+.chroma .k, .chroma .kc, .chroma .kd, .chroma .kn, .chroma .kp, .chroma .kr, .chroma .kt { color: var(--orange); font-weight: bold; }
+.chroma .s, .chroma .s1, .chroma .s2, .chroma .sb, .chroma .sa, .chroma .se, .chroma .sr, .chroma .ss { color: oklch(0.84 0.11 130); }
+.chroma .m, .chroma .mi, .chroma .mf, .chroma .mh, .chroma .mo { color: oklch(0.84 0.1 80); }
+.chroma .nf, .chroma .fm { color: oklch(0.85 0.09 230); }
+.chroma .nt { color: var(--orange); }
+.chroma .na { color: oklch(0.85 0.09 80); }
+.chroma .nb, .chroma .bp { color: oklch(0.85 0.08 300); }
+.chroma .o, .chroma .ow, .chroma .p { color: oklch(0.85 0.02 46.61); }
+
 
 
 /* Responsive */

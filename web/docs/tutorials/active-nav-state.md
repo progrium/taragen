@@ -4,19 +4,19 @@ tags: [jsx, layouts]
 ---
 
 In your JSX page file (or layout file), reference a nav partial:
-```
+```jsx
 {partial("_nav")}
 ```
 
 Add the following to a CSS file:
-```
+```css
 .selected {
 	font-weight: bold;
 }
 ```
 
 Create a `nav.jsx` file with:
-```
+```jsx
 () => {
   const navLink = (href, text) => {
     let className = "";
