@@ -18,7 +18,7 @@ func buildCmd() *cli.Command {
 				fatal(err)
 			}
 
-			if err := taragen.NewSite(wd, false).GenerateAll("_public", false); err != nil {
+			if err := taragen.NewSite(wd, false).GenerateAll("_public", true); err != nil {
 				fatal(err)
 			}
 		},

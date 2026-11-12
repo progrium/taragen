@@ -18,7 +18,7 @@ data({
                 <guid isPermaLink="false">{`${siteUrl}${post.path}`}</guid>
                 <description>{post.description}</description>
                 <content:encoded>
-                    {`<![CDATA[${post.body}]]>`}
+                    {raw(`<![CDATA[${post.body}]]>`)}
                 </content:encoded>
                 <pubDate>{new Date(post.date).toUTCString()}</pubDate>
             </item>

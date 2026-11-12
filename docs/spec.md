@@ -19,8 +19,8 @@ The binary has two modes:
 - `taragen serve` parses the site, serves it on `http://localhost:8088`
   (including drafts), renders pages on demand, and live reloads the browser when
   sources change.
-- `taragen build` (aliases `gen`, `generate`) renders every page to static files
-  under `_public/` in the current directory.
+- `taragen build` (aliases `gen`, `generate`) cleans `_public/` in the current
+  directory and renders every page to static files there.
 
 Both commands operate on the current working directory as the site root.
 
@@ -37,7 +37,7 @@ Both commands operate on the current working directory as the site root.
 | `format_tmpl.go` | Go `text/template` parser, template helper funcs, `RenderTemplate`. |
 | `jsx.go` | JSX runtime: esbuild transform, goja VM setup, `hyper` element factory, HTML serialization. |
 | `reloader.go` | File watcher and WebSocket-based live reload. |
-| `jsx_test.go` | Table tests for JSX rendering. |
+| `jsx_test.go`, `site_test.go` | Table tests for JSX rendering, and build, serve, and watcher tests on temporary sites. |
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
 | `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, computed state, and signing. |
@@ -54,6 +54,7 @@ A `Site` is rooted at a directory. `Site.walk` traverses it with these rules:
 - Names starting with `_` are skipped (directories are pruned). This is how
   layouts, partials, globals, defaults, and assets stay out of the page tree.
   It also means the build output directory `_public/` is never re-ingested.
+  `build` copies the root `_assets/` directory separately (see Build mode).
 - A file whose name ends in a registered format extension (`.md`, `.jsx`,
   `.tmpl`) is a page source. Directories are also visited as potential pages.
 - Every other file is a static file.
@@ -66,6 +67,7 @@ Special files, all resolved relative to the site root:
 | `_globals.jsx` | JS values and helper functions available to all JSX in that directory and below. |
 | `_defaults.jsx` | Default page data for pages in that directory and below. |
 | any other `_name.jsx` / `_name.tmpl` | A partial, loaded by path via `partial("_dir/name")`. |
+| `_assets/` (root only) | Static files copied verbatim to `_public/_assets/` by `build`, never rendered. |
 
 ### Page paths
 
@@ -135,8 +137,7 @@ type PageParser interface {
 
 A parser turns a page's source into a body and returns any data it discovered.
 Adding a format means implementing `PageParser` and adding it to the map; the
-walker, page resolution, and watcher pick it up by extension (the watcher's
-extension list is currently hard-coded, see below).
+walker, page resolution, and watcher pick it up by extension.
 
 ### JSX
 
@@ -147,30 +148,47 @@ JSX is the primary format and the most involved. The pipeline in `jsx.go`:
 2. **Transform.** esbuild transforms the source with the JSX loader, using
    `hyper` as the factory and the string `'<>'` as the fragment, so
    `<div class="x">hi</div>` becomes `hyper("div", {class: "x"}, "hi")`.
-3. **Execute.** A fresh goja VM is created for every render. `hyper` (a Go
-   function) and all globals are set on it, and the transformed code is run.
+3. **Execute.** A fresh goja VM is created for every render. `hyper` and `raw`
+   (Go functions bound to that VM) and all globals are set on it, and the
+   transformed code is run.
 4. **Call.** If the script's completion value is a function, it is called with
    the render arguments. This is how layouts (`(content) => ...`) and partials
    with parameters work; plain pages evaluate straight to an element.
-5. **Serialize.** The result is exported to a Go `hyperNode` tree and serialized
-   to HTML by `hyperNode.String()`, then `<newline></newline>` markers are
-   turned back into real newlines.
+5. **Serialize.** The result is converted to a Go `hyperNode` tree and
+   serialized to HTML, then `<newline></newline>` markers are turned back into
+   real newlines. A marker that landed inside a JS string (in a `<pre>`) is
+   turned back into a newline in the text node.
 
-`hyper` accepts children that are other nodes, strings, `int64`s, or arrays
-(flattened, so `.map(...)` works); `null`/`undefined` children are dropped.
-Attribute values may be strings (empty strings are omitted), booleans (emitted
-as bare attributes when true), or objects (serialized as a `style` string).
+`hyper` accepts children that are other nodes, strings, numbers, or arrays
+(flattened, so `.map(...)` works); `null`, `undefined`, and booleans render
+nothing, so `{cond && <b/>}` works. Numbers are formatted as JS prints them.
+Attribute values may be strings (empty strings are omitted), numbers, booleans
+(emitted as bare attributes when true, omitted when false), or objects
+(serialized as a `style` string); `null` and `undefined` omit the attribute.
 Void elements such as `img`, `meta`, and `br` are self-closed when they have no
-children. Anything else panics, and the JSX page parser recovers the panic into
-an error.
+children. Anything else throws a JS `TypeError`, which fails the render.
+
+**Attribute order.** `hyper` reads attributes from the JS object's own key
+order, so they are written in source order, as are the keys of a style object.
+Output is the same on every build.
+
+**Escaping.** Text children are escaped (`&`, `<`, `>`) and attribute values are
+escaped (`&`, `<`, `>`, `"`, `'`). Text inside `<script>` and `<style>` is
+written as is. `raw(html)` returns a node whose string is inserted unescaped
+(`null`/`undefined` give an empty node). Partials and a JSX layout's `content`
+argument are raw nodes, because they are already rendered HTML; any other HTML
+string, such as `post.body` from `pages()`, needs `raw()`.
 
 Output is a string, not a DOM: there is no client-side runtime, no hydration, and
 no component state. JSX is purely a templating language here.
 
 **Page wrapping.** `JSXParser` wraps page sources in a `<>...</>` fragment so a
 page can have multiple root elements or start with a bare `{partial(...)}`
-expression. If the source contains `data`, everything up to the first `;` is
-treated as the `data({...});` statement and kept outside the fragment.
+expression. If the first statement (after whitespace and comments) is a
+`data(...)` call, it is kept outside the fragment. Its end is found by matching
+parentheses while skipping strings, template literals, and comments, and a
+trailing `;` is optional. Pages that mention `data` anywhere else are wrapped
+whole.
 
 **`data()`.** When the globals include `page`, `RenderJSX` installs a `data(obj)`
 function that merges `obj` into both the JS `page` object and the Go page `Data`
@@ -185,8 +203,10 @@ Built-in globals, added after user globals so they always win:
 
 - `page`: the current page's `Data` map.
 - `partial(name, ...args)`: renders `_name.jsx` (falling back to `_name.tmpl`)
-  with the same globals and returns the HTML string. Errors are returned as the
-  string value rather than thrown.
+  with the same globals and returns the HTML as a raw node. A missing or failing
+  partial throws an error naming it, which fails the page render.
+- `raw(html)`: inserts an HTML string unescaped (see Escaping above). It is set
+  in every JSX VM, including layouts and partials.
 - `pages(query)`: returns page data objects (each with a recursive `subpages`
   array). A plain path returns the sorted subpages of that page. A query
   containing `*` is matched with `path.Match` against every page path and
@@ -247,8 +267,8 @@ then applies layouts:
    `_layout.tmpl` files nearest-first.
 2. **Apply the chain.** Starting with the nearest layout, render it with the
    current output as its content. JSX layouts receive it as their single
-   function argument; template layouts get it through `content` and may set data
-   (including `layout`) in frontmatter.
+   function argument, as a raw node; template layouts get it through `content`
+   and may set data (including `layout`) in frontmatter.
 3. **Explicit overrides.** If rendering a layout changes `page.layout`, the
    remaining default layouts are discarded and the newly named layout is
    applied next. This lets a page or layout opt into a specific chain. Setting
@@ -282,17 +302,25 @@ preamble + gohtml-formatted output
 
 ## Build mode
 
-`taragen build` calls `NewSite(cwd, false).GenerateAll("_public", false)`:
+`taragen build` calls `NewSite(cwd, false).GenerateAll("_public", true)`:
 
-1. `ParseAll()` resets the page map and parses every page found by `walk`.
-2. `walk` runs again. Static files are copied to the same relative path in the
-   destination. Pages are rendered: pages without an extension (and the root)
-   go to `<path>/index.html`, giving clean URLs; pages whose name keeps an
-   extension (e.g. `feed.xml.jsx` → `feed.xml`) are written as-is. Pages with
-   no source (bare directories) and drafts are skipped.
+1. `ParseAll()` resets the page map and parses every page path found by `walk`,
+   once each.
+2. **Clean.** With `clobber` set, every entry in the destination is removed
+   except dot-prefixed entries at its top level, so a checked-out deploy
+   repository (`_public/.git`) survives. Renamed and deleted pages don't linger.
+3. **Assets.** Every file under the root `_assets/` directory (skipping
+   dot-prefixed names) is copied verbatim to `_public/_assets/`, whatever its
+   extension. `_assets` directories below the root are not copied.
+4. `walk` runs again. Static files are copied to the same relative path in the
+   destination. Pages are rendered, each page path once (a directory and its
+   `index.*` file share one): pages without an extension (and the root) go to
+   `<path>/index.html`, giving clean URLs; pages whose name keeps an extension
+   (e.g. `feed.xml.jsx` → `feed.xml`) are written as-is. Pages with no source
+   (bare directories) and drafts are skipped.
 
-The `clobber` option to wipe the destination exists in the API but the CLI
-passes `false`, so stale files in `_public/` are not removed between builds.
+Any render error, including a failing partial, stops the build with a non-zero
+exit.
 
 ## Serve mode
 
@@ -302,7 +330,9 @@ parses everything, and serves on port 8088 (hard-coded). `Site.ServeHTTP`:
 - `/.live-reload` upgrades to a WebSocket (see below).
 - If the trimmed request path is a known page, it is rendered into a buffer,
   served with the page's content type, and the live reload script is injected
-  before `</body>`.
+  before `</body>`. The lookup and render run under the site mutex, the same
+  one `ParseAll` takes, so a reload during a request can't race. A render error
+  is a 500 with the error text.
 - Otherwise the request is served from disk with `http.ServeFile`. Because this
   bypasses `walk`, underscore paths such as `/_assets/...` are reachable in serve
   mode.
@@ -310,9 +340,11 @@ parses everything, and serves on port 8088 (hard-coded). `Site.ServeHTTP`:
 ### Live reload
 
 `watchForReloads` uses `tractor.dev/toolkit-go`'s `watchfs` to recursively watch
-the site directory. When a `.md`, `.jsx`, or `.tmpl` file or a directory
-changes, it calls `ParseAll()` (to pick up new and removed pages) and closes
-every open reload WebSocket. The injected client script is a one-liner that
+the site directory. Any change outside dot-prefixed paths and `_public/` closes
+every open reload WebSocket, so CSS and other static edits reload the browser.
+A change to a page source (by the extensions in `Formats`), a directory, or an
+extensionless name (possibly a deleted directory) first calls `ParseAll()` to
+pick up new and removed pages. The injected client script is a one-liner that
 reloads the page when its socket closes:
 
 ```html
@@ -353,39 +385,17 @@ no messages, and a server restart also triggers a reload.
 These reflect the current code and were verified against the example site
 where noted.
 
-- **Underscore assets are not built.** `walk` prunes every `_`-prefixed
-  directory, so `web/_assets/` is not copied to `_public/` by `taragen build`,
-  even though pages reference `/_assets/...` and it works under `serve`
-  (verified by building `web/`). The same rule excludes `web/_blog/` from both
-  modes, which appears to be how the example blog is currently disabled.
-- **Duplicate rendering.** A directory and its `index.*` file normalize to the
-  same page path, so `build` renders such pages twice (harmless but wasted
-  work; visible as repeated `rendered:` lines).
-- **No HTML escaping.** `hyperNode.String()` writes text and attribute values
-  verbatim. This is what lets `partial()` return HTML strings that render
-  unescaped, but it also means content containing `<` or `"` must be escaped by
-  hand (the site does this with `&lt;` in code samples).
-- **Nondeterministic attribute order.** Attributes come from a Go map, so their
-  order in the output can vary between renders.
-- **Limited JS value types.** Children must be strings, integers, nodes, or
-  arrays, so a float (e.g. `{1.5}`) panics; attributes must be strings, bools,
-  or style objects.
-- **`data` detection is textual.** `wrapJSX` looks for the substring `data` and
-  the first `;` anywhere in the file, so pages that mention "data" in content
-  without a leading `data()` call can be split incorrectly.
-- **Concurrency.** `ParseAll` takes the site mutex, but `ServeHTTP` renders and
-  reads `Site.pages` without it, so a reload during a request can race. Page
-  data is also mutated during render.
-- **Watcher scope.** Only page-format files and directories trigger reloads;
-  CSS and other static edits need a manual refresh. The extension list is
-  hard-coded rather than derived from `Formats`.
-- **Hard-coded CLI settings.** Port `8088`, output dir `_public`, and
-  `clobber=false` are not configurable yet (there is a TODO for the port).
+- **Underscore directories.** Apart from the root `_assets/`, `walk` prunes
+  every `_`-prefixed directory, which excludes `web/_blog/` from both modes;
+  this appears to be how the example blog is currently disabled. Serve mode
+  still serves any underscore path from disk.
+- **Serialized serve.** Requests render one at a time under the site mutex,
+  because rendering mutates page data. Fine for local preview.
+- **Hard-coded CLI settings.** Port `8088`, output dir `_public`, and cleaning
+  the output are not configurable yet (there is a TODO for the port).
 - **Template partials get no helpers.** `Site.Partial` renders `.tmpl` partials
   with no function map and ignores arguments, and the template `page` helper
   assumes string values.
-- **Partial errors are silent.** A failing `partial()` call in JSX renders the
-  error message as text instead of failing the build.
 
 ## Build and release
 
@@ -399,8 +409,9 @@ where noted.
 - CI (`.github/workflows/build.yml`) delegates to the shared
   `progrium/github-workflows` Go CLI build workflow on every push, with
   Go 1.23.1 and an extra linux-386 target.
-- Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`
-  and the design tooling tests.
+- Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`,
+  the build, serve, and watcher tests in `site_test.go`, and the design tooling
+  tests.
 
 ## Design process tooling
 
