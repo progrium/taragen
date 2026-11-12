@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Code highlighting through CSS classes
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Highlighted code blocks in Markdown get CSS classes instead of inline `style` attributes, so the site's stylesheet decides how code looks.
