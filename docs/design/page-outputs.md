@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Extra output files per page
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Let a site write extra files for each page, such as a plain text version at `/articles/2021/ngrok.txt` next to `/articles/2021/ngrok/`.
