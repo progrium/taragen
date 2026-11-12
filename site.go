@@ -16,6 +16,7 @@ import (
 type Site struct {
 	dir    string
 	pages  map[string]*Page
+	routes *RouteTable
 	drafts bool
 
 	mu sync.Mutex
@@ -56,70 +57,60 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 		return err
 	}
 
-	copyFile := func(filename string) error {
-		b, err := os.ReadFile(filename)
-		if err != nil {
+	for _, r := range s.routes.Routes() {
+		if err := s.generate(dest, r); err != nil {
 			return err
 		}
-		targetPath := path.Join(dest, strings.TrimPrefix(filename, s.dir))
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+	}
+	return nil
+}
+
+// generate writes one route to dest: it copies a static file, or renders a
+// page or output, skipping drafts.
+func (s *Site) generate(dest string, r *Route) error {
+	if r.Draft() {
+		fmt.Println("skip draft:", r.URL)
+		return nil
+	}
+	targetPath := filepath.Join(dest, filepath.FromSlash(r.File))
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		return err
+	}
+
+	if r.Kind == RouteStatic {
+		b, err := os.ReadFile(r.Source)
+		if err != nil {
 			return err
 		}
 		if err := os.WriteFile(targetPath, b, 0644); err != nil {
 			return err
 		}
-		fmt.Println("copied:", strings.TrimPrefix(filename, s.dir))
+		fmt.Println("copied:", r.URL)
 		return nil
 	}
 
-	// _assets is pruned from the page tree like every underscore directory,
-	// but pages link to /_assets/..., so it is copied verbatim.
-	if err := s.walkAssets(copyFile); err != nil {
+	f, err := os.Create(targetPath)
+	if err != nil {
 		return err
 	}
-
-	// a directory and its index file normalize to the same page path
-	rendered := make(map[string]bool)
-
-	return s.walk(func(filename string, pagepath string) error {
-		if pagepath == "" {
-			return copyFile(filename)
-		} else {
-			if rendered[pagepath] {
-				return nil
-			}
-			rendered[pagepath] = true
-			p := s.Page(pagepath)
-			if len(p.Source()) == 0 {
-				fmt.Println("skip dir:", pagepath)
-				return nil
-			}
-			if p.Draft() {
-				fmt.Println("skip draft:", pagepath)
-				return nil
-			}
-			var targetPath string
-			if filepath.Ext(p.path) == "" || p.path == "." {
-				targetPath = path.Join(dest, p.path, "index.html")
-			} else {
-				targetPath = path.Join(dest, p.path)
-			}
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-				return err
-			}
-			f, err := os.Create(targetPath)
-			if err != nil {
-				return err
-			}
-			if err := p.Render(f); err != nil {
-				f.Close()
-				return err
-			}
-			f.Close()
-			fmt.Println("rendered:", p.path)
-		}
-		return nil
-	})
+	defer f.Close()
+	switch r.Kind {
+	case RoutePage:
+		err = r.Page.Render(f)
+	case RouteOutput:
+		_, err = r.Output.Render(f)
+	default:
+		err = fmt.Errorf("unknown route kind: %s", r.Kind)
+	}
+	if err != nil {
+		return err
+	}
+	if r.Kind == RoutePage {
+		fmt.Println("rendered:", r.Page.path)
+	} else {
+		fmt.Println("rendered:", r.File)
+	}
+	return f.Close()
 }
 
 // AssetsDir is the root-level directory copied verbatim by build.
@@ -240,25 +231,54 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 	})
 }
 
+// ParseAll resets the page map, parses every page found by walk, and builds
+// the route table.
 func (s *Site) ParseAll() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.pages = make(map[string]*Page)
+	s.routes = nil
+
+	var pagepaths, statics []string
 	parsed := make(map[string]bool)
 
-	return s.walk(func(filename string, pagepath string) error {
-		if pagepath == "" || parsed[pagepath] {
+	// _assets is pruned from the page tree like every underscore directory,
+	// but pages link to /_assets/..., so its files are static routes.
+	if err := s.walkAssets(func(filename string) error {
+		statics = append(statics, filename)
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if err := s.walk(func(filename string, pagepath string) error {
+		if pagepath == "" {
+			statics = append(statics, filename)
+			return nil
+		}
+		// a directory and its index file normalize to the same page path
+		if parsed[pagepath] {
 			return nil
 		}
 		parsed[pagepath] = true
+		pagepaths = append(pagepaths, pagepath)
+		return s.Page(pagepath).Parse()
+	}); err != nil {
+		return err
+	}
 
-		if err := s.Page(pagepath).Parse(); err != nil {
-			return err
-		}
+	routes, err := s.buildRoutes(pagepaths, statics)
+	if err != nil {
+		return err
+	}
+	s.routes = routes
+	return nil
+}
 
-		return nil
-	})
+// Routes returns the route table built by the last ParseAll.
+func (s *Site) Routes() *RouteTable {
+	return s.routes
 }
 
 func (s *Site) normalizePath(p string) string {
@@ -277,37 +297,46 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	normalPath := strings.Trim(r.URL.Path, "/")
-	if normalPath == "" {
-		normalPath = "."
-	}
-
 	// Rendering reads the page map and mutates page data, and the watcher
-	// replaces the map in ParseAll, so both run under the site lock.
+	// replaces the map and route table in ParseAll, so both run under the
+	// site lock.
 	var buf bytes.Buffer
-	var page *Page
+	var route *Route
 	var contentType string
 	var err error
 	func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		if s.IsPage(normalPath) {
-			page = s.Page(normalPath)
-			err = page.Render(&buf)
-			contentType = page.ContentType()
+		route = s.routes.Lookup(r.URL.Path)
+		if route == nil {
+			return
+		}
+		switch route.Kind {
+		case RoutePage:
+			err = route.Page.Render(&buf)
+			contentType = route.Page.ContentType()
+		case RouteOutput:
+			contentType, err = route.Output.Render(&buf)
 		}
 	}()
 
-	if page != nil {
-		if err != nil {
-			log.Println(normalPath, ":", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", contentType)
+	if route == nil {
+		http.ServeFile(w, r, path.Join(s.dir, path.Clean("/"+r.URL.Path)))
+		return
+	}
+	if route.Kind == RouteStatic {
+		http.ServeFile(w, r, route.Source)
+		return
+	}
+	if err != nil {
+		log.Println(route.URL, ":", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	if isHTML(contentType) {
 		injectLiveReload(w, buf)
 		return
 	}
-
-	http.ServeFile(w, r, path.Join(s.dir, normalPath))
+	w.Write(buf.Bytes())
 }

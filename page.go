@@ -25,13 +25,32 @@ const (
 	ContentType = "contentType"
 	Draft       = "draft"
 	Preamble    = "preamble"
+	Outputs     = "outputs"
 )
 
 type Page struct {
 	path    string // normalized path to the page (ex: path/to/page)
+	file    string // source file relative to the site root, once parsed
 	data    Data
 	site    *Site
 	globals map[string]any
+	outputs []*Output // outputs that apply to the page and are turned on
+
+	// set while parsing: the output templates that apply, and the outputs
+	// opt-out value read from page data
+	templates []*Output
+	optOut    any
+}
+
+// URL returns the page's URL path, such as "/" or "/docs/intro".
+func (p *Page) URL() string {
+	return path.Clean("/" + p.path)
+}
+
+// Outputs returns the page's outputs that apply to it and are turned on, as
+// of its last parse.
+func (p *Page) Outputs() []*Output {
+	return p.outputs
 }
 
 func getData[T any](data Data, key string, fallback T) T {
@@ -193,10 +212,16 @@ func (p *Page) Parse() error {
 		suffixes = append(suffixes, "/index"+ext)
 	}
 
+	// page.outputs is always recomputed, so a value left by a previous parse
+	// isn't read as an opt-out
+	p.data[Outputs] = map[string]any{}
+	p.outputs, p.templates, p.optOut = nil, nil, nil
+
 	for _, suffix := range suffixes {
 		src, err = os.ReadFile(path.Join(p.site.dir, p.path+suffix))
 		if err == nil {
 			format = filepath.Ext(suffix)
+			p.file = p.path + suffix
 			if strings.HasPrefix(suffix, "/index") {
 				p.data[IsDir] = true
 			}
@@ -227,16 +252,59 @@ func (p *Page) Parse() error {
 		return fmt.Errorf("unknown page format: %s", format)
 	}
 
+	// page.outputs is set before the body runs, so the page can read it.
+	// Opt-outs set by defaults apply now, and the page's own opt-outs replace
+	// them as they are read.
+	if p.templates, err = p.outputTemplates(); err != nil {
+		return err
+	}
+	p.setOptOut(p.data[Outputs])
+
 	body, data, err := f.Parse(p)
 	if err != nil {
 		return err
 	}
+	optOut, setByFrontmatter := data[Outputs]
 	for k, v := range data {
 		p.data[k] = v
 	}
 	p.data[Body] = string(body)
+	if setByFrontmatter {
+		p.optOut = optOut
+	}
+
+	if p.ContentType() == "text/html" {
+		p.outputs = enabledOutputs(p.templates, p.optOut)
+	}
+	p.data[Outputs] = outputsMap(p.outputs)
 
 	return nil
+}
+
+// setOptOut records an outputs opt-out value and sets page.outputs to the
+// outputs it leaves on.
+func (p *Page) setOptOut(optOut any) {
+	p.optOut = optOut
+	p.data[Outputs] = outputsMap(enabledOutputs(p.templates, optOut))
+}
+
+// onData is called after each data() call in a JSX page body, so a page
+// that turns outputs off never reads its own opt-out back from page.outputs.
+func (p *Page) onData(data map[string]any) {
+	if v, ok := data[Outputs]; ok {
+		p.setOptOut(v)
+	}
+}
+
+// enabledOutputs filters templates by an outputs opt-out value.
+func enabledOutputs(templates []*Output, optOut any) []*Output {
+	var outputs []*Output
+	for _, o := range templates {
+		if outputEnabled(optOut, o.Name) {
+			outputs = append(outputs, o)
+		}
+	}
+	return outputs
 }
 
 func (p *Page) Render(w io.Writer) (err error) {

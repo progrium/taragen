@@ -30,7 +30,9 @@ Both commands operate on the current working directory as the site root.
 | --- | --- |
 | `cmd/taragen/` | CLI entry point (`main.go`, `serve.go`, `build.go`) built on `tractor.dev/toolkit-go` engine/cli. |
 | `site.go` | `Site`: directory walking, page registry, static build, HTTP handler, partial loading. |
+| `routes.go` | `RouteTable`: every URL the site serves and the page, output, or static file that produces it. |
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
+| `outputs.go` | `Output`: `_outputs/` template lookup, opt-outs, `page.outputs`, and output rendering. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
 | `query.go` | `pages()` queries: pattern matching with `**`, the object form with `where`, and the listing order. |
@@ -38,7 +40,7 @@ Both commands operate on the current working directory as the site root.
 | `format_tmpl.go` | Go `text/template` parser, template helper funcs, `RenderTemplate`. |
 | `jsx.go` | JSX runtime: esbuild transform, goja VM setup, `hyper` element factory, HTML serialization. |
 | `reloader.go` | File watcher and WebSocket-based live reload. |
-| `jsx_test.go`, `site_test.go` | Table tests for JSX rendering, and build, serve, and watcher tests on temporary sites. |
+| `*_test.go` | Table tests for JSX rendering, and page, output, build, serve, and watcher tests on temporary sites. |
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
 | `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, computed state, and signing. |
@@ -53,7 +55,8 @@ A `Site` is rooted at a directory. `Site.walk` traverses it with these rules:
 
 - Names starting with `.` are skipped (directories are pruned).
 - Names starting with `_` are skipped (directories are pruned). This is how
-  layouts, partials, globals, defaults, and assets stay out of the page tree.
+  layouts, partials, globals, defaults, output templates, and assets stay out
+  of the page tree.
   It also means the build output directory `_public/` is never re-ingested.
   `build` copies the root `_assets/` directory separately (see Build mode).
 - A file whose name ends in a registered format extension (`.md`, `.jsx`,
@@ -67,6 +70,7 @@ Special files, all resolved relative to the site root:
 | `_layout.jsx` / `_layout.tmpl` | Directory layout wrapping every page in that directory and below. |
 | `_globals.jsx` | JS values and helper functions available to all JSX in that directory and below. |
 | `_defaults.jsx` | Default page data for pages in that directory and below. |
+| `_outputs/<name>.jsx` | An output template: an extra file for every HTML page in that directory and below (see Outputs). |
 | any other `_name.jsx` / `_name.tmpl` | A partial, loaded by path via `partial("_dir/name")`. |
 | `_assets/` (root only) | Static files copied verbatim to `_public/_assets/` by `build`, never rendered. |
 
@@ -101,6 +105,7 @@ built-in meaning:
 | `draft` | Explicit draft flag. |
 | `contentType` | Defaults to `text/html`; served as the HTTP `Content-Type`. |
 | `preamble` | Text written before the output; defaults to `<!DOCTYPE html>` for HTML. |
+| `outputs` | Set by taragen to a map from output name to URL (see Outputs). A page sets it to `false`, or to a map with `false` entries, to turn outputs off. |
 
 Any other keys (`title`, `description`, ...) are free-form and flow through to
 JSX and templates untouched.
@@ -117,7 +122,7 @@ Data is populated in this order, later writers winning:
 ### Drafts
 
 `Page.Draft()` is true if `draft: true` is set **or** the page's `date` is in
-the future. `build` always skips drafts. `serve` constructs the site with
+the future. A draft's outputs are drafts too. `build` always skips drafts. `serve` constructs the site with
 `drafts=true`, so drafts are still rendered and included in `pages()` listings.
 `Subpages()` filters drafts only when the site is not in drafts mode.
 
@@ -195,6 +200,9 @@ whole.
 **`data()`.** When the globals include `page`, `RenderJSX` installs a `data(obj)`
 function that merges `obj` into both the JS `page` object and the Go page `Data`
 map. This is how JSX pages set `title`, `layout`, `contentType`, and so on.
+In a page body, a `data()` call that sets `outputs` is read as an opt-out right
+away, so `page.outputs` stays the map of URLs. Output templates get their own
+`data()` (see Outputs).
 
 **Globals.** `ExportJSX` runs a `_globals.jsx` or `_defaults.jsx` file as a
 script and returns every global key that did not exist before execution. That is
@@ -289,8 +297,12 @@ having no frontmatter.
    built-in globals.
 4. Load defaults: collect `_defaults.jsx` the same way and merge their exports
    into page data.
-5. Store the source in `src`, run the format's parser, merge the returned data,
+5. Find the output templates that apply and set `page.outputs`, applying any
+   opt-out the defaults set (see Outputs).
+6. Store the source in `src`, run the format's parser, merge the returned data,
    and store the result in `body`.
+7. Set `page.outputs` again from the page's final data: empty unless the
+   page's `contentType` is `text/html`, and without the outputs it turned off.
 
 ### Rendering a page
 
@@ -329,6 +341,82 @@ nearest _layout ─► parent _layout ─► ... ─► root _layout
 preamble + gohtml-formatted output
 ```
 
+### Outputs
+
+An output is an extra file written for a page, such as a plain text version at
+`/about.txt` beside `/about/`. Each comes from an output template,
+`_outputs/<name>.jsx`, in any directory of the site. `<name>` is a lowercase
+letter followed by lowercase letters and digits, and the rest of the file name
+after the first `.` makes the URL suffix: `_outputs/txt.jsx` is output `txt`
+with suffix `.txt`, and `_outputs/card.png.jsx` is output `card` with suffix
+`.card.png`. Other names fail the parse, as do two templates in one directory
+with the same name. Dot-prefixed and non-`.jsx` files in `_outputs/` are
+ignored.
+
+Templates are scoped like layouts: looking from the page's own path up to the
+root, the nearest template wins for each name, and a nearer template replaces
+a farther one even when its suffix differs. Only pages with a source and a
+`contentType` of `text/html` get outputs; bare directories and pages like
+`feed.xml.jsx` get none.
+
+**Opt-outs.** `outputs: false` in page data turns every output off for that
+page, and `outputs: { card: false }` turns off the named ones. Names that don't
+apply are ignored. It is ordinary page data, so it can come from frontmatter,
+`data()`, or a `_defaults.jsx` (`outputs = {card: false}`), with the usual
+precedence: the page's own value replaces the defaults' whole.
+
+**`page.outputs`.** Parsing sets `outputs` in page data to a map from output
+name to URL for the outputs that are on, replacing the opt-out value. It is set
+before the body runs, so the body, its layouts, and `pages()` results from
+other pages can all link to `page.outputs.txt`. Every parsed page has the key,
+as an empty map when it has no outputs.
+
+**URLs.** An output's URL is the page's URL with the suffix appended, using
+`/index` for the root: `/articles/ngrok.txt` for page `/articles/ngrok`, and
+`/index.txt` for `/`. `build` writes it to the same path under `_public/`.
+
+**Rendering.** `Output.Render` re-parses the page, then runs the template in a
+fresh VM with the page's globals, so `page` is the page's data including `src`
+and `body` (the body before layouts). Layouts are not applied. The completion
+value is the whole file; a function is called with no arguments first. A string
+result is written verbatim, without escaping or formatting, and an element is
+serialized as for pages. Inside the template, `data()` sets the output's own
+data and never the page's. It reads:
+
+| Key | Meaning |
+| --- | --- |
+| `contentType` | Defaults to the type for the suffix's last extension (`text/plain; charset=utf-8` for `.txt`), or `application/octet-stream`. |
+| `preamble` | Written before the output, followed by a newline. Defaults to none, even for HTML. |
+
+A `text/html` output is formatted with `gohtml` like a page. A template that
+throws fails the build, or is a 500 in `serve`, with an error naming the output
+and its page.
+
+### Route table
+
+`ParseAll` ends by building a `RouteTable` that maps every URL the site serves
+to the one thing that produces it. Each `Route` has a kind, a URL, and the file
+`build` writes it to:
+
+| Kind | URL | File |
+| --- | --- | --- |
+| `page` | `/`, `/about`, `/feed.xml` | `index.html`, `about/index.html`, `feed.xml` |
+| `output` | `/about.txt` | `about.txt` |
+| `static` | `/img/logo.svg`, `/_assets/style.css` | the same path |
+
+Pages with a source are page routes, written to `<path>/index.html` when the
+page path has no extension (and for the root), and as-is otherwise. Bare
+directories have no route. Static routes are the non-page files `walk` finds
+plus the files under the root `_assets/` directory.
+
+Lookups ignore leading and trailing slashes, so `/about` and `/about/` are the
+same route. Two routes with the same URL or the same file fail `ParseAll`
+with an error naming both producers, such as an output `foo.txt` and a static
+file `foo.txt`, or a page `foo` and a static `foo/index.html`. Drafts stay in
+the table; `Route.Draft()` reports whether the route's page is a draft, and
+each mode applies its own draft rule. `Site.Routes()` returns the table from the
+last `ParseAll`.
+
 ### Ordering
 
 Every listing, from `pages()` and from `subpages`, is sorted by `sortPages`
@@ -346,23 +434,19 @@ pages at the end.
 
 `taragen build` calls `NewSite(cwd, false).GenerateAll("_public", true)`:
 
-1. `ParseAll()` resets the page map and parses every page path found by `walk`,
-   once each.
+1. `ParseAll()` resets the page map, parses every page path found by `walk`
+   once each (a directory and its `index.*` file share one), and builds the
+   route table. A route collision stops the build.
 2. **Clean.** With `clobber` set, every entry in the destination is removed
    except dot-prefixed entries at its top level, so a checked-out deploy
    repository (`_public/.git`) survives. Renamed and deleted pages don't linger.
-3. **Assets.** Every file under the root `_assets/` directory (skipping
-   dot-prefixed names) is copied verbatim to `_public/_assets/`, whatever its
-   extension. `_assets` directories below the root are not copied.
-4. `walk` runs again. Static files are copied to the same relative path in the
-   destination. Pages are rendered, each page path once (a directory and its
-   `index.*` file share one): pages without an extension (and the root) go to
-   `<path>/index.html`, giving clean URLs; pages whose name keeps an extension
-   (e.g. `feed.xml.jsx` → `feed.xml`) are written as-is. Pages with no source
-   (bare directories) and drafts are skipped.
+3. **Routes.** Every route is written, in order of its file: static files
+   (including `_assets/`) are copied verbatim, and pages and outputs are
+   rendered to their files. Drafts and their outputs are skipped. Each page
+   renders once.
 
-Any render error, including a failing partial, stops the build with a non-zero
-exit.
+Any render error, including a failing partial or output template, stops the
+build with a non-zero exit.
 
 ## Serve mode
 
@@ -370,23 +454,27 @@ exit.
 parses everything, and serves on port 8088 (hard-coded). `Site.ServeHTTP`:
 
 - `/.live-reload` upgrades to a WebSocket (see below).
-- If the trimmed request path is a known page, it is rendered into a buffer,
-  served with the page's content type, and the live reload script is injected
-  before `</body>`. The lookup and render run under the site mutex, the same
-  one `ParseAll` takes, so a reload during a request can't race. A render error
-  is a 500 with the error text.
-- Otherwise the request is served from disk with `http.ServeFile`. Because this
-  bypasses `walk`, underscore paths such as `/_assets/...` are reachable in serve
-  mode.
+- Otherwise the request path is looked up in the route table. A page or output
+  is rendered into a buffer on demand, including drafts, and served with its
+  content type; the live reload script is injected before `</body>` only into
+  `text/html` responses. A static route is served from its source file. The
+  lookup and render run under the site mutex, the same one `ParseAll` takes, so
+  a reload during a request can't race. A render error is a 500 with the error
+  text.
+- Paths not in the table are served from disk with `http.ServeFile`. Because
+  this bypasses `walk`, underscore paths are reachable in serve mode, and a
+  bare directory gets a directory listing.
 
 ### Live reload
 
 `watchForReloads` uses `tractor.dev/toolkit-go`'s `watchfs` to recursively watch
 the site directory. Any change outside dot-prefixed paths and `_public/` closes
 every open reload WebSocket, so CSS and other static edits reload the browser.
-A change to a page source (by the extensions in `Formats`), a directory, or an
-extensionless name (possibly a deleted directory) first calls `ParseAll()` to
-pick up new and removed pages. The injected client script is a one-liner that
+A change to a page source (by the extensions in `Formats`, which includes
+output templates), a directory, or an extensionless name (possibly a deleted
+directory) first calls `ParseAll()` to pick up new and removed pages and
+outputs. Edits to an existing output template show on the next request, since
+outputs are rendered fresh each time. The injected client script is a one-liner that
 reloads the page when its socket closes:
 
 ```html
@@ -407,7 +495,8 @@ no messages, and a server restart also triggers a reload.
   semantics (no components with hooks, no `className`/event handling).
 - **Filesystem as the configuration.** There is no config file. Routing comes
   from file paths, and behaviour is attached by underscore files whose effect is
-  scoped to their directory subtree (layouts, globals, defaults).
+  scoped to their directory subtree (layouts, globals, defaults, output
+  templates).
 - **One data map per page.** Frontmatter, `data()`, defaults, and built-in
   fields all write into the same `Data` map, which is exposed identically to Go,
   JSX (`page`), and listings (`pages()`).
@@ -452,8 +541,9 @@ where noted.
   `progrium/github-workflows` Go CLI build workflow on every push, with
   Go 1.23.1 and an extra linux-386 target.
 - Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`,
-  the build, serve, and watcher tests in `site_test.go`, and the design tooling
-  tests.
+  the page tests in `page_test.go`, the output and route table tests in
+  `outputs_test.go`, the build, serve, and watcher tests in `site_test.go` and
+  `serve_test.go`, and the design tooling tests.
 
 ## Design process tooling
 
