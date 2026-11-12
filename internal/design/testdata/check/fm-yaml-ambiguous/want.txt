@@ -1,3 +1,0 @@
-error: docs/design/a.md:3: title: value "yes" would be read as a YAML boolean or null
-error: docs/design/b.md:8: areas: invalid list item "a,b" (lists are written [a, b])
-error: docs/design/c.md:3: title: value starts with YAML indicator "'"

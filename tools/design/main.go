@@ -24,14 +24,10 @@ var commands = []command{
 	{"list", "[--status S] [--area A]", "table of slug, issue, status, computed state, and title", cmdList},
 	{"ready", "", "accepted proposals with no branch and every dependency implemented", cmdReady},
 	{"graph", "", "the dependency graph, as Mermaid", cmdGraph},
-	{"status", "", "rewrite the status index (run on main only)", cmdStatus},
 	{"new", "<slug> [--title T] [--author LOGIN]", "start a draft from the template", cmdNew},
-	{"propose", "<slug> [--yes] [--dry-run] [--issue N]", "file its issue and make it proposed", cmdPropose},
 	{"log", "<slug>", "its status and branch changes, with their commits", cmdLog},
-	{"sign", "<slug|spec> [--login L --date YYYY-MM-DD]", "sign a doc you've reviewed (people only, never agents)", cmdSign},
-	{"close-issues", "[--dry-run]", "close the issues of implemented, declined, and superseded proposals", cmdCloseIssues},
-	{"check", "", "validate proposals, test tags, signatures, and links", cmdCheck},
-	{"test", "<slug> [go test flags]", "run one proposal's tagged test cases, whatever its status", cmdTest},
+	{"sign", "<slug|spec>", "sign a doc you've reviewed (people only, never agents)", cmdSign},
+	{"check", "", "validate proposals, signatures, and links", cmdCheck},
 }
 
 func usage() {

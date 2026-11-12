@@ -1,2 +1,0 @@
-error: docs/design/a.md:12: signed by "Mallory Example", who is not in docs/design/SIGNERS
-error: docs/spec.md:3: signed by "Bob Example", who is not in docs/design/SIGNERS

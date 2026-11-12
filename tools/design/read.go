@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -73,22 +72,6 @@ func cmdGraph(root string, args []string) error {
 		return err
 	}
 	fmt.Print(r.Graph(time.Now()))
-	return nil
-}
-
-func cmdStatus(root string, args []string) error {
-	if len(args) > 0 {
-		return fmt.Errorf("status takes no arguments")
-	}
-	r, err := load(root)
-	if err != nil {
-		return err
-	}
-	out := filepath.Join(root, design.IndexPath)
-	if err := os.WriteFile(out, []byte(r.Index(time.Now())), 0644); err != nil {
-		return err
-	}
-	fmt.Println("wrote", design.IndexPath)
 	return nil
 }
 
@@ -160,31 +143,6 @@ func cmdLog(root string, args []string) error {
 		prevStatus, prevBranch = status, branch
 	}
 	return nil
-}
-
-// cmdTest runs the test cases tagged with one proposal, whatever its status.
-func cmdTest(root string, args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("test takes a slug")
-	}
-	slug, rest := args[0], args[1:]
-	r, err := load(root)
-	if err != nil {
-		return err
-	}
-	if r.BySlug[slug] == nil {
-		return fmt.Errorf("no proposal %q", slug)
-	}
-	// match subtests whose name ends in a tag list that includes slug
-	run := fmt.Sprintf(`/\[(.*, )?%s(, .*)?\]$`, slug)
-	cmdArgs := append([]string{"test", "-run", run}, rest...)
-	cmdArgs = append(cmdArgs, "./...")
-	cmd := exec.Command("go", cmdArgs...)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "DESIGN_PENDING=1")
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	fmt.Println("go", strings.Join(cmdArgs, " "))
-	return cmd.Run()
 }
 
 func contains(list []string, s string) bool {

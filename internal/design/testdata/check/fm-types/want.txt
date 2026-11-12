@@ -1,4 +1,0 @@
-error: docs/design/a.md:2: issue "seven" is not a number
-error: docs/design/a.md:9: superseded-by must be a single value, not a list
-error: docs/design/b.md:5: created "2026-13-01" is not a YYYY-MM-DD date
-error: docs/design/b.md:6: authors must be a list, like [a, b]

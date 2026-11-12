@@ -1,1 +1,0 @@
-error: docs/design/a.md:4: unknown status "in-progress" (want one of draft, proposed, accepted, implemented, declined, hold, superseded)

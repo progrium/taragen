@@ -1,3 +1,0 @@
-error: docs/design/SIGNERS:2: expected "<login> <Full Name>", got "broken"
-error: docs/design/a.md:12: signature "November 3, 2026 · Alice Example" is not in the form "Nov 11, 2026 · Full Name, h.d.a."
-error: docs/design/b.md:12: signed by "Alice Example, hda", who is not in docs/design/SIGNERS

@@ -1,2 +1,0 @@
-error: docs/design/a.md:7: depends refers to "12" by number; refer to proposals by slug
-error: docs/design/b.md:8: superseded-by refers to "4" by number; refer to proposals by slug

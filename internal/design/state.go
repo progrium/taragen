@@ -1,6 +1,10 @@
 package design
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // StaleAfter is how long a proposal branch can go without a commit before
 // the proposal counts as stalled.
@@ -53,4 +57,27 @@ func (r *Repo) Ready() []*Proposal {
 		}
 	}
 	return out
+}
+
+// Graph renders the dependency graph as Mermaid. An edge points from a
+// dependency to the proposal that needs it.
+func (r *Repo) Graph(now time.Time) string {
+	var b strings.Builder
+	b.WriteString("graph TD\n")
+	id := func(slug string) string { return "p_" + strings.ReplaceAll(slug, "-", "_") }
+	for _, p := range r.Proposals {
+		label := p.Status
+		if s := r.State(p, now); s != "" {
+			label += ", " + s
+		}
+		fmt.Fprintf(&b, "  %s[\"%s<br/><i>%s</i>\"]\n", id(p.Slug), p.Slug, label)
+	}
+	for _, p := range r.Proposals {
+		for _, d := range p.Depends {
+			if r.BySlug[d] != nil {
+				fmt.Fprintf(&b, "  %s --> %s\n", id(d), id(p.Slug))
+			}
+		}
+	}
+	return b.String()
 }

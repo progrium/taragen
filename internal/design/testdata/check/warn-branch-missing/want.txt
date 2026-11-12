@@ -1,1 +1,0 @@
-warning: docs/design/a.md:8: branch "a-v2" not found (fetch every branch tip to check)

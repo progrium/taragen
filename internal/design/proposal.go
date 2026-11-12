@@ -16,7 +16,6 @@ const (
 	DesignDir    = "docs/design"
 	SpecPath     = "docs/spec.md"
 	SignersPath  = DesignDir + "/SIGNERS"
-	IndexPath    = DesignDir + "/STATUS.md"
 	TemplateName = "TEMPLATE.md"
 )
 
@@ -24,7 +23,6 @@ const (
 var nonProposals = map[string]bool{
 	"README.md":  true,
 	TemplateName: true,
-	"STATUS.md":  true,
 }
 
 // Statuses, in the order they are documented.

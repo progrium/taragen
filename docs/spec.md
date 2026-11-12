@@ -39,8 +39,7 @@ Both commands operate on the current working directory as the site root.
 | `jsx_test.go` | Table tests for JSX rendering. |
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
-| `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, status index, issues, and signing. |
-| `internal/proposaltest/` | Ties Go test cases to proposals by tags in their names. |
+| `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, computed state, and signing. |
 | `docs/spec.md`, `docs/design/` | This spec, and the design proposals that change it. |
 | `AGENTS.md` | Rules for AI agents working in the repository. |
 
@@ -400,32 +399,24 @@ where noted.
   `progrium/github-workflows` Go CLI build workflow on every push, with
   Go 1.23.1 and an extra linux-386 target.
 - Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`
-  (tagged `[baseline]`) and the design tooling tests.
+  and the design tooling tests.
 
 ## Design process tooling
 
 Design changes go through proposals in `docs/design/`, as described in the
-[design process README](design/README.md). The tooling that supports it lives in
-the repository and uses only Go, git, and the `gh` CLI:
+[design process README](design/README.md). The tooling lives in the repository
+and uses only Go and git:
 
 - `internal/design` parses proposal frontmatter (a strict YAML subset, with its
   own parser rather than a YAML library, so anything another parser could read
   differently is rejected), loads `docs/design/`, `SIGNERS`, and this spec, and
   implements `Check`, the computed states (ready, in progress, stalled, read
-  from branch refs), the Mermaid graph, and the generated `STATUS.md`.
-- `tools/design` is the CLI: `list`, `ready`, `graph`, `status`, `new`,
-  `propose`, `log`, `sign`, `close-issues`, `check`, and `test`. `sign` is
-  interactive unless given `--login` and `--date`; `propose` and
-  `close-issues` shell out to `gh`.
-- `internal/proposaltest` skips subtests tagged with an unimplemented proposal
-  unless `DESIGN_PENDING=1`.
-- `check` rules are tested by fixtures under `internal/design/testdata/check/`,
-  each a tiny repository root with the exact diagnostics it should produce.
-- CI: `design-check.yml` runs `check` on every PR; `test.yml` runs `go test`
-  on PRs except from `claude/` branches; `design-status.yml` regenerates
-  `STATUS.md` and closes decided proposals' issues on main; `design-sign.yml`
-  signs a doc for a listed signer on a `/sign` PR comment, using the tool and
-  `SIGNERS` from main.
+  from branch refs), and the Mermaid dependency graph. Its rules are covered by
+  a table test.
+- `tools/design` is the CLI: `list`, `ready`, `graph`, `new`, `log`, `sign`,
+  and `check`. `sign` runs only at a terminal and asks the signer to type the
+  slug.
+- `design-check.yml` runs `check` on every PR.
 
 ## Dependencies
 

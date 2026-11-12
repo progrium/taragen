@@ -2,8 +2,6 @@ package taragen
 
 import (
 	"testing"
-
-	"github.com/progrium/taragen/internal/proposaltest"
 )
 
 func TestJSX(t *testing.T) {
@@ -15,35 +13,35 @@ func TestJSX(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "basic element [baseline]",
+			name:     "basic element",
 			globals:  map[string]any{"foo": "bar"},
 			input:    `<div>{foo}</div>`,
 			expected: `<div>bar</div>`,
 		},
 		{
-			name:     "nested elements [baseline]",
+			name:     "nested elements",
 			globals:  map[string]any{"foo": "bar"},
 			input:    `<div><span>{foo}</span></div>`,
 			expected: `<div><span>bar</span></div>`,
 		},
 		{
-			name:     "attributes [baseline]",
+			name:     "attributes",
 			globals:  map[string]any{"foo": "bar"},
 			input:    `<div class={foo}>hello</div>`,
 			expected: `<div class="bar">hello</div>`,
 		},
 		{
-			name:     "self closing [baseline]",
+			name:     "self closing",
 			input:    `<img src="test.jpg"/>`,
 			expected: `<img src="test.jpg"/>`,
 		},
 		{
-			name:     "fragment [baseline]",
+			name:     "fragment",
 			input:    `<><div>1</div><div>2</div></>`,
 			expected: `<div>1</div><div>2</div>`,
 		},
 		{
-			name:     "function component [baseline]",
+			name:     "function component",
 			input:    `(name) => <div>Hello {name}</div>`,
 			args:     []any{"World"},
 			expected: `<div>Hello World</div>`,
@@ -51,7 +49,7 @@ func TestJSX(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		proposaltest.Run(t, tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			result, err := RenderJSX(tt.name, []byte(tt.input), tt.globals, tt.args...)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -64,23 +62,21 @@ func TestJSX(t *testing.T) {
 }
 
 func TestJSXWithPageData(t *testing.T) {
-	proposaltest.Run(t, "data() merges into page data [baseline]", func(t *testing.T) {
-		pageData := Data{"foo": "input", "bar": "input"}
-		globals := map[string]any{"page": pageData}
-		input := `data({bar: "page"}); <div>{page.foo}_{page.bar}</div>`
+	pageData := Data{"foo": "input", "bar": "input"}
+	globals := map[string]any{"page": pageData}
+	input := `data({bar: "page"}); <div>{page.foo}_{page.bar}</div>`
 
-		result, err := RenderJSX("test", []byte(input), globals)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+	result, err := RenderJSX("test", []byte(input), globals)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-		expected := `<div>input_page</div>`
-		if string(result) != expected {
-			t.Errorf("expected %q, got %q", expected, string(result))
-		}
+	expected := `<div>input_page</div>`
+	if string(result) != expected {
+		t.Errorf("expected %q, got %q", expected, string(result))
+	}
 
-		if pageData["bar"] != "page" {
-			t.Fatal("page data not updated")
-		}
-	})
+	if pageData["bar"] != "page" {
+		t.Fatal("page data not updated")
+	}
 }

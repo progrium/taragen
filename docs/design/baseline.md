@@ -23,7 +23,6 @@ The [spec](../spec.md) was written from the code as it stood and describes all o
 ## Proposal
 
 The spec as first committed is taragen's baseline design. Everything it describes counts as decided, and changes to it go through proposals from here on.
-Test cases that prove existing behavior are tagged `[baseline]`.
 
 ## Rationale
 
@@ -41,13 +40,11 @@ None: no code changes, so nothing new is reachable.
 ## Done criteria
 
 - [x] The spec describes the CLI, site conventions, formats, rendering flow, build and serve modes, and known limitations, as of commit `0f08e28`.
-- [x] The existing JSX cases in `jsx_test.go` are tagged `[baseline]` and pass with `go test ./...`.
-- [x] `go run ./tools/design test baseline` runs the tagged cases.
+- [x] The existing JSX cases in `jsx_test.go` pass with `go test ./...`.
 
 ## Implementation
 
 1. Write the spec from the code.
-2. Tag the existing JSX test cases with `[baseline]`.
 
 ## Updates
 

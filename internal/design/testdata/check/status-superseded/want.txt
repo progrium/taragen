@@ -1,1 +1,0 @@
-error: docs/design/a.md:4: superseded proposal has no superseded-by

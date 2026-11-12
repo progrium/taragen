@@ -9,11 +9,11 @@ This README is how taragen applies the workflow. It was adopted by the [design-p
 ## Principles
 
 - **Facts are stored, state is computed.** Frontmatter records only facts (status, dependencies, branches, issue number). Whether a proposal is ready, in progress, or stalled is derived from those facts and from git.
-- **Proposals are permanent and named by slug.** A slug never changes and is the only way a proposal is referenced: in `depends`, test tags, links, commits, and PRs.
+- **Proposals are permanent and named by slug.** A slug never changes and is the only way a proposal is referenced: in `depends`, links, commits, and PRs.
 - **Bodies describe intent, not progress.** Progress lives in status, `branch`, Done criteria checkboxes, and dated Updates notes.
 - **Decisions stay findable.** Declined and superseded proposals stay here with their reasons.
 - **A person stands behind each design.** A proposal or the spec is signed by a named person who directed and reviewed it. Automation and AI agents can draft, but never sign.
-- **CI enforces the rules.** `check` runs on every PR, and the status index is regenerated on main after each merge.
+- **CI enforces the rules.** `check` runs on every PR.
 
 ## Files
 
@@ -23,7 +23,6 @@ This README is how taragen applies the workflow. It was adopted by the [design-p
 | `README.md` (this file) | The workflow as taragen applies it | A proposal that changes the process |
 | [`TEMPLATE.md`](TEMPLATE.md) | The sections a new proposal starts from | A proposal that changes the process |
 | `<slug>.md` | One proposal: what changes, why, and how it's proven | Its authors, under the rules below |
-| `STATUS.md` | Generated table and dependency graph | Only the status job on main |
 | [`SIGNERS`](SIGNERS) | Who may sign, as `<login> <Full Name>` per line | Only the person each line names |
 | [`../../AGENTS.md`](../../AGENTS.md) | The rules AI agents follow | A proposal that changes the process |
 
@@ -39,7 +38,7 @@ Write one before changing any of taragen's public surfaces:
 - **Serve mode:** HTTP behavior and the live reload protocol.
 - **New major components:** a new page format, an asset pipeline, plugins, or a new dependency that changes how sites are built.
 - **Distribution:** supported platforms and install channels.
-- **This process:** this README, the template, `tools/design`, the design CI jobs, and `AGENTS.md`.
+- **This process:** this README, the template, `tools/design`, the design check job, and `AGENTS.md`.
 
 Bug fixes, workarounds, performance work that doesn't change output, internal refactors, and changes to the example site in `web/` don't need one; put their reasoning in code comments and commit messages.
 A bug fix that changes documented behavior (for example, copying `_assets/` in builds) does need one. When in doubt, draft one.
@@ -135,18 +134,18 @@ A doc is signed with a line under its title: `Nov 11, 2026 · Full Name, h.d.a.`
 **h.d.a.** means *human-directed, AI-assisted*: work substantially directed by the named person, who reviewed it closely enough to defend it and takes responsibility for it, however much AI wrote. A line without `, h.d.a.` is also accepted, for work written by hand.
 The spec is signed the same way by whoever last reviewed it as a whole.
 
-Only a deliberate act by the named person adds a signature: a `/sign <slug>` or `/sign spec` comment on a PR, `go run ./tools/design sign <slug>` at a terminal, or typing the line by hand.
-Re-sign after significant changes. Only people in [SIGNERS](SIGNERS) can sign, and each person adds their own line there. Agents never sign, run `sign`, post `/sign`, or edit `SIGNERS`. An unsigned proposal is unlikely to be accepted.
+Only a deliberate act by the named person adds a signature: `go run ./tools/design sign <slug>` (or `sign spec`) at a terminal, or typing the line by hand.
+Re-sign after significant changes. Only people in [SIGNERS](SIGNERS) can sign, and each person adds their own line there. Agents never sign, run `sign`, or edit `SIGNERS`. An unsigned proposal is unlikely to be accepted.
 
 ## Flow
 
 1. **Draft.** `go run ./tools/design new <slug> --title "..."` copies the template with frontmatter filled in. A spike for a draft is fine; record its branch in `branch`.
-2. **Optionally propose.** `go run ./tools/design propose <slug>` files the issue, labeled `Proposal`, and sets `status: proposed` in one commit. Discussion happens on the issue; the doc is revised in commits.
+2. **Optionally propose.** File a GitHub issue titled `proposal: <title>` with the Abstract and a link to the file, then set `issue` and `status: proposed` in one commit. Discussion happens on the issue; the doc is revised in commits.
 3. **Sign.** The person who directed the work reviews the whole doc and signs it.
 4. **Optionally accept.** If it's decided but nobody is starting it yet, set `status: accepted`.
 5. **Build on a feature branch** named after the slug, listed in `branch`. Each PR updates Done criteria, `depends` if a dependency turns up, and dated Updates notes.
 6. **Finish.** The PR that completes the proposal updates the spec, checks off or waives every Done criteria item, and sets `status: implemented` and `branch: [main]` in its last commit, so a squash merge carries both.
-7. **After merge.** The status job regenerates `STATUS.md` and closes the proposal's issue.
+7. **After merge.** Close the proposal's issue, if it has one, or let the PR close it with "closes #N".
 
 `implemented` requires exactly `branch: [main]`, and `main` is allowed only on an implemented proposal.
 
@@ -162,68 +161,37 @@ To supersede, set `status: superseded` and `superseded-by: <new-slug>`.
 
 ### Issues
 
-An issue is optional and exists only for feedback; the file is the source of truth.
-`propose` asks before filing (it acts as your `gh` account), refuses if an open issue already has the title, and takes `--dry-run`, `--yes`, and `--issue N` to adopt an existing issue.
-After each merge to main, `close-issues` closes the open issue of each implemented proposal as completed, and of each declined or superseded one as not planned, with a comment linking the doc. It leaves closed issues alone.
-
-## Tests tied to proposals
-
-Go test cases are tagged with the proposals they prove by ending the subtest name with their slugs in brackets, written exactly `[a, b]`:
-
-```go
-proposaltest.Run(t, "renders fragments [baseline]", func(t *testing.T) { ... })
-```
-
-- A tagged case whose proposal isn't implemented is skipped, unless `DESIGN_PENDING=1` is set. It starts running in the commit that marks the proposal implemented.
-- Untagged cases always run.
-- `go run ./tools/design test <slug>` runs one proposal's tagged cases whatever its status (and, since Go can't filter them out, every top-level test that has no subtests).
-- `check` validates the tags in `_test.go` files, on lines that call `.Run(` or set a `name:` field: the format, and that each slug exists.
-
-Demos are written as tagged test cases, so there is no separate demo registry.
+An issue is optional and exists only for feedback; the file is the source of truth. Close it as completed when the proposal is implemented, or as not planned when it's declined or superseded.
 
 ## Tooling
 
-`tools/design` implements the workflow with only the Go toolchain, git, and the `gh` CLI for the commands that touch issues. Run `go run ./tools/design` for usage.
+`tools/design` implements the workflow with only the Go toolchain and git. Run `go run ./tools/design` for usage.
 
 | Command | Does |
 | --- | --- |
 | `list [--status S] [--area A]` | Table of slug, issue, status, computed state, and title |
 | `ready` | Accepted proposals with no branch and every dependency implemented |
 | `graph` | The dependency graph, as Mermaid |
-| `status` | Rewrites `STATUS.md`; run on main only |
 | `new <slug> [--title T] [--author LOGIN]` | Starts a draft from the template |
-| `propose <slug> [--yes] [--dry-run] [--issue N]` | Files its issue and makes it proposed |
 | `log <slug>` | Its status and branch changes, with their commits |
 | `sign <slug or spec>` | Signs a doc you've reviewed; interactive, asks you to type the slug |
-| `close-issues [--dry-run]` | Closes issues of implemented, declined, and superseded proposals |
-| `check` | Validates proposals, test tags, signatures, and links |
-| `test <slug>` | Runs one proposal's tagged test cases |
-
-`STATUS.md` is generated, never hand-edited, and never committed in PRs, so two PRs that change statuses never conflict over it. Use `list` and `ready` for the current state anywhere.
+| `check` | Validates proposals, signatures, and links |
 
 ### What check enforces
 
-`check` fails on: unparseable frontmatter, unknown keys, missing required fields, unknown statuses, bad dates; a file not named for its slug, duplicate slugs or issue numbers, a slug starting with a digit without an issue; references by number or to unknown slugs in `depends`, `superseded-by`, or test tags; test tags not written `[a, b]`; links to files under `docs/design/` that don't exist, from any file; dependency cycles; an implemented proposal depending on an unimplemented one; an accepted proposal depending on a declined one; `proposed` without `issue`; `declined` without a Declined section; `superseded` without `superseded-by`; `implemented` without `branch: [main]`, or `main` on anything else; Done criteria items that aren't checkboxes, or open items on an implemented proposal; and signature lines in neither form or naming someone not in `SIGNERS`.
+`check` fails on: unparseable frontmatter, unknown keys, missing required fields, unknown statuses, bad dates; a file not named for its slug, duplicate slugs or issue numbers, a slug starting with a digit without an issue; references by number or to unknown slugs in `depends` or `superseded-by`; links from Markdown files to files under `docs/design/` that don't exist; dependency cycles; an implemented proposal depending on an unimplemented one; an accepted proposal depending on a declined one; `proposed` without `issue`; `declined` without a Declined section; `superseded` without `superseded-by`; `implemented` without `branch: [main]`, or `main` on anything else; Done criteria items that aren't checkboxes, or open items on an implemented proposal; and signature lines in neither form or naming someone not in `SIGNERS`.
 
 It warns when a proposed or accepted proposal has every Done criteria item checked or waived, and when a branch in `branch` can't be found.
 
-It skips `vendor/` and `testdata/` directories when scanning for tags and links. Each rule has a fixture under `internal/design/testdata/check/`.
+It skips `vendor/` and `testdata/` directories when scanning for links. The rules are tested by a table test in `internal/design/check_test.go`.
 
 ## CI
 
-| Workflow | Runs |
-| --- | --- |
-| `design-check.yml` | `check` on every PR (and by hand), with every branch tip fetched; a new push cancels the previous run. |
-| `test.yml` | `go test ./...` on PRs, except from `claude/` branches, which get only the design check. Run it by hand on any branch. |
-| `design-status.yml` | On pushes to main that touch `docs/design/` or the tool, daily, and by hand: `status`, then `close-issues`, committing `STATUS.md` as a bot if it changed. |
-| `design-sign.yml` | On a PR comment whose first line is `/sign <slug>` or `/sign spec`: signs as the commenter if they're in main's `SIGNERS`, for same-repository PRs only, and replies with the result. |
-
-Commits pushed by CI with the default token don't trigger other workflows, so a PR head after a `/sign` commit has no check results until the next push. Keep that in mind before making the check a required status.
-A PR that says "closes #N" closes the issue on merge before `close-issues` runs; that's harmless, but the doc-link comment is lost.
+`design-check.yml` runs `check` on every PR (and by hand), with every branch tip fetched shallowly so it can find each proposal's branch. A new push cancels the previous run.
 
 ## Local choices
 
 - Stalled after **7 days** without a commit.
-- Branches starting with **`claude/`** are agent branches and skip the full test suite.
 - The signature abbreviation is **h.d.a.**
-- `close-issues` doesn't sync labels from status.
+
+Not adopted yet, to keep the tooling small: a generated status index, commands that file and close issues, signing by PR comment, and tagging test cases with proposals. Each can be added later with a proposal.

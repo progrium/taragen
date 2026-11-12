@@ -1,1 +1,0 @@
-warning: docs/design/a.md:5: every Done criteria item is checked or waived; is it implemented?

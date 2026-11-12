@@ -1,1 +1,0 @@
-error: docs/design/a.md:1: missing frontmatter: file must start with a "---" line

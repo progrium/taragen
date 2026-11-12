@@ -1,2 +1,0 @@
-error: x_test.go:4: test tag [a,a] must be written exactly as [a, b]
-error: x_test.go:5: test tag [ a ] must be written exactly as [a, b]

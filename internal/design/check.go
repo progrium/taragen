@@ -32,8 +32,8 @@ func (d Diag) String() string {
 	return fmt.Sprintf("%s: %s: %s", kind, loc, d.Msg)
 }
 
-// SkipPrefixes are paths check never scans for test tags or links: vendored
-// code, and the checker's own fixtures, which are broken on purpose.
+// SkipPrefixes are paths check never scans for links: vendored code, and
+// testdata directories.
 var SkipPrefixes = []string{"vendor/"}
 
 func skipped(file string) bool {
@@ -70,8 +70,8 @@ func (c *checker) warnf(p string, line int, format string, args ...any) {
 	c.diags = append(c.diags, Diag{Path: p, Line: line, Msg: fmt.Sprintf(format, args...), Warn: true})
 }
 
-// Check validates every proposal, test tag, signature, and link to the
-// design directory. Diagnostics are sorted by path and line.
+// Check validates every proposal and signature, and every link to the
+// design directory from a Markdown file. Diagnostics are sorted by path and line.
 func Check(r *Repo) []Diag {
 	c := &checker{r: r, linked: map[string]bool{}}
 	c.diags = append(c.diags, r.SignerErr...)
@@ -357,19 +357,11 @@ func (c *checker) graph() {
 }
 
 var (
-	// a test name ending in " [a, b]" tags the case with proposals; names
-	// are looked for on lines that run a subtest or set a table's name field
-	tagLineRe = regexp.MustCompile(`\.Run\(|\bname:\s`)
-	tagCandRe = regexp.MustCompile(`\s\[([a-z0-9 ,#-]+)\]["` + "`" + `]`)
-	tagRe     = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*(, [a-z0-9]+(-[a-z0-9]+)*)*$`)
-	// literal paths into the design directory, from any file
+	// literal paths into the design directory
 	designPathRe = regexp.MustCompile(regexp.QuoteMeta(DesignDir) + `/[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.md`)
 	// relative Markdown links
 	mdLinkRe = regexp.MustCompile(`\]\(([^)\s#]+)(#[^)\s]*)?\)`)
 )
-
-// generated files may not exist yet in a PR checkout
-var generated = map[string]bool{IndexPath: true}
 
 func (c *checker) files() error {
 	files, err := TrackedFiles(c.r.Root)
@@ -380,48 +372,32 @@ func (c *checker) files() error {
 		if skipped(f) {
 			continue
 		}
-		isTest := strings.HasSuffix(f, "_test.go")
-		isMD := strings.HasSuffix(f, ".md")
+		if !strings.HasSuffix(f, ".md") {
+			continue
+		}
 		b, err := os.ReadFile(filepath.Join(c.r.Root, f))
 		if err != nil || strings.ContainsRune(string(b[:min(len(b), 8000)]), 0) {
 			continue
 		}
 		for i, line := range strings.Split(string(b), "\n") {
 			n := i + 1
-			if isTest && tagLineRe.MatchString(line) {
-				for _, m := range tagCandRe.FindAllStringSubmatch(line, -1) {
-					c.tag(f, n, m[1])
-				}
-			}
 			for _, m := range designPathRe.FindAllString(line, -1) {
 				c.link(f, n, path.Clean(m))
 			}
-			if isMD {
-				for _, m := range mdLinkRe.FindAllStringSubmatch(line, -1) {
-					target := m[1]
-					if strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") || strings.HasPrefix(target, "/") {
-						continue
-					}
-					c.link(f, n, path.Clean(path.Join(path.Dir(f), target)))
+			for _, m := range mdLinkRe.FindAllStringSubmatch(line, -1) {
+				target := m[1]
+				if strings.Contains(target, "://") || strings.HasPrefix(target, "mailto:") || strings.HasPrefix(target, "/") {
+					continue
 				}
+				c.link(f, n, path.Clean(path.Join(path.Dir(f), target)))
 			}
 		}
 	}
 	return nil
 }
 
-func (c *checker) tag(file string, line int, inner string) {
-	if !tagRe.MatchString(inner) {
-		c.errorf(file, line, "test tag [%s] must be written exactly as [a, b]", inner)
-		return
-	}
-	for _, s := range strings.Split(inner, ", ") {
-		c.ref(file, line, "test tag", s)
-	}
-}
-
 func (c *checker) link(file string, line int, target string) {
-	if !strings.HasPrefix(target, DesignDir+"/") || generated[target] {
+	if !strings.HasPrefix(target, DesignDir+"/") {
 		return
 	}
 	key := fmt.Sprintf("%s:%d:%s", file, line, target)

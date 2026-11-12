@@ -160,31 +160,6 @@ func parseLine(line string, lineNo int) (*Field, string) {
 	return f, ""
 }
 
-// SetField rewrites the frontmatter line for key in src, or inserts it at
-// the end of the frontmatter if it is missing. It leaves every other byte of
-// src alone. value is written verbatim.
-func SetField(src, key, value string) (string, error) {
-	lines := strings.Split(src, "\n")
-	if len(lines) == 0 || lines[0] != "---" {
-		return "", fmt.Errorf("missing frontmatter")
-	}
-	newLine := key + ":"
-	if value != "" {
-		newLine += " " + value
-	}
-	for i := 1; i < len(lines); i++ {
-		if lines[i] == "---" {
-			lines = append(lines[:i], append([]string{newLine}, lines[i:]...)...)
-			return strings.Join(lines, "\n"), nil
-		}
-		if lines[i] == key+":" || strings.HasPrefix(lines[i], key+": ") {
-			lines[i] = newLine
-			return strings.Join(lines, "\n"), nil
-		}
-	}
-	return "", fmt.Errorf("unterminated frontmatter")
-}
-
 // FormatList writes items as a flow list: [a, b].
 func FormatList(items []string) string {
 	return "[" + strings.Join(items, ", ") + "]"

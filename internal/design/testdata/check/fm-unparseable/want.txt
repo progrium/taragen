@@ -1,2 +1,0 @@
-error: docs/design/a.md:8: expected "key: value", got "this line has no separator"
-error: docs/design/a.md:9: indented line in frontmatter (nesting is not allowed)

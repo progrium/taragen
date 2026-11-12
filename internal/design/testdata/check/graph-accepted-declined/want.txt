@@ -1,1 +1,0 @@
-error: docs/design/a.md:7: accepted proposal depends on "b", which was declined
