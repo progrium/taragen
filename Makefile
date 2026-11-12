@@ -35,6 +35,18 @@ design-check:
 	go run ./tools/design check
 .PHONY: design-check
 
+RESVG_DIR	:= internal/raster/module
+RESVG_WASM	:= $(RESVG_DIR)/target/wasm32-unknown-unknown/release/taragen_resvg.wasm
+CARGO_HOME	?= $(HOME)/.cargo
+
+## Rebuild the embedded resvg WebAssembly module (needs rustup)
+resvg:
+	cd $(RESVG_DIR) && \
+		RUSTFLAGS="--remap-path-prefix=$(CARGO_HOME)=/cargo --remap-path-prefix=$(CURDIR)/$(RESVG_DIR)=/src" \
+		cargo build --locked --release --target wasm32-unknown-unknown
+	cp $(RESVG_WASM) internal/raster/resvg.wasm
+.PHONY: resvg
+
 ## Build the web assets
 web-build:
 	cd web && taragen build

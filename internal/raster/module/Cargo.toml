@@ -1,0 +1,20 @@
+[package]
+name = "taragen-resvg"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+resvg = { version = "=0.50.0", default-features = false, features = ["text", "raster-images"] }
+wuff = "=0.2.10"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
