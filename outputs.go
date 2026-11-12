@@ -169,6 +169,14 @@ func (o *Output) Render(w io.Writer) (contentType string, err error) {
 		return "", fmt.Errorf("output %s of %s: %w", o.Name, p.URL(), err)
 	}
 	contentType = getData(data, ContentType, o.defaultContentType())
+	if isPNG(contentType) {
+		png, err := p.site.rasterize(out, data)
+		if err != nil {
+			return "", fmt.Errorf("output %s of %s: %w", o.Name, p.URL(), err)
+		}
+		_, err = w.Write(png)
+		return contentType, err
+	}
 	if preamble := getData(data, Preamble, ""); preamble != "" {
 		if _, err = io.WriteString(w, preamble+"\n"); err != nil {
 			return "", err

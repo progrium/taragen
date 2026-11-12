@@ -12,7 +12,8 @@ type JSXParser struct{}
 
 func builtinGlobals(p *Page) map[string]any {
 	return map[string]any{
-		"page": p.data,
+		"page":        p.data,
+		"measureText": measureTextFunc(p.site),
 		"partial": func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
 			name := call.Argument(0).String()
 			var args []any

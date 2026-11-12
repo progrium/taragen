@@ -20,6 +20,9 @@ type Site struct {
 	drafts bool
 
 	mu sync.Mutex
+
+	fontsMu sync.Mutex
+	fonts   siteFonts
 }
 
 func NewSite(dir string, drafts bool) *Site {
@@ -239,6 +242,10 @@ func (s *Site) ParseAll() error {
 
 	s.pages = make(map[string]*Page)
 	s.routes = nil
+
+	if err := s.refreshFonts(); err != nil {
+		return err
+	}
 
 	var pagepaths, statics []string
 	parsed := make(map[string]bool)

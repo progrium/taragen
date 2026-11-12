@@ -125,7 +125,9 @@ func (p *Page) Subpages() (subpages []*Page) {
 }
 
 func (p *Page) loadGlobals() error {
-	globals := make(map[string]any)
+	// measureText is set before _globals.jsx runs, so helpers defined there
+	// (like a word wrapper) can call it.
+	globals := map[string]any{"measureText": measureTextFunc(p.site)}
 
 	// find all _globals.jsx files in parent directories
 	var globalsFiles []string

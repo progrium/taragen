@@ -1,0 +1,32 @@
+name: resvg module
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: resvg-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  reproduce:
+    name: Rebuild matches committed module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads internal/raster/module/rust-toolchain.toml and installs
+      # the pinned toolchain and wasm32 target.
+      - run: make resvg
+      - name: Compare with the committed module
+        run: git diff --exit-code --stat internal/raster/resvg.wasm
+  cross:
+    name: linux-386 renders cards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # wazero has no compiler for 386, so this runs the module in its
+      # interpreter.
+      - run: GOARCH=386 CGO_ENABLED=0 go test -run 'Card|Measure|Render|Font|Image' . ./internal/raster

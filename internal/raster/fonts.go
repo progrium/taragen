@@ -207,5 +207,8 @@ func (f *Fonts) Measure(text string, style TextStyle) (float64, error) {
 		}
 		return 0, fmt.Errorf("measureText: %w", err)
 	}
-	return float64(math.Float32frombits(binary.LittleEndian.Uint32(out))), nil
+	// The module works in f32; round off its noise so whole-pixel widths
+	// come out whole.
+	w := float64(math.Float32frombits(binary.LittleEndian.Uint32(out)))
+	return math.Round(w*1e4) / 1e4, nil
 }

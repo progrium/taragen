@@ -1,12 +1,12 @@
 ---
 slug: share-cards
 title: Share card images
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: [page-outputs]
 areas: [jsx, site, serve, deps]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Share card images
@@ -189,20 +189,20 @@ The embedded `.wasm` is a binary in the repository. It's built from source in th
 
 ## Done criteria
 
-- [ ] `TestCardPNG`: `_outputs/card.png.jsx` returning a 1200 by 630 `<svg>` element builds `about.card.png` and `index.card.png` as valid 1200 by 630 PNGs whose pixels match the drawn shapes.
-- [ ] `TestCardSVGString`: a template returning SVG markup as a string renders the same PNG as the equivalent element.
-- [ ] `TestCardScale`: `data({ scale: 2 })` produces a 2400 by 1260 PNG; `scale: 5` and `width="5000"` fail with errors.
-- [ ] `TestCardFonts`: text in a test font loaded from `testdata/` as TTF and as WOFF2 renders identical glyph pixels, and system fonts are never used.
-- [ ] `TestCardUnknownFont`: a `font-family` naming no loaded family fails the build with the family named in the error.
-- [ ] `TestCardImages`: `<image>` with a root-relative site path and with a `data:` URI renders; `https:`, `file:`, relative, `..`, and symlinked-out paths fail.
-- [ ] `TestCardDeterministic`: two builds produce byte-identical PNGs.
-- [ ] `TestMeasureText`: widths match the rendered text's extent within a pixel, weight changes the width, and an unknown family throws.
-- [ ] `TestServeCard`: `serve` answers `/about.card.png` with `Content-Type: image/png`, and editing a font file or the template changes the next response.
-- [ ] `TestCardNoEngine`: building a site with no raster output never compiles the module.
-- [ ] CI rebuilds the resvg module from source and it matches the committed file.
-- [ ] `make dist` builds for every release target with `CGO_ENABLED=0`, and a linux-386 build renders `TestCardPNG` correctly.
-- [ ] The `web/` site adds `_outputs/card.png.jsx`, a font under `_assets/`, and `og:image` tags, and `make web-build` writes the cards.
-- [ ] The spec describes raster outputs, font loading, `measureText`, and the new dependency.
+- [x] `TestCardPNG`: `_outputs/card.png.jsx` returning a 1200 by 630 `<svg>` element builds `about.card.png` and `index.card.png` as valid 1200 by 630 PNGs whose pixels match the drawn shapes.
+- [x] `TestCardSVGString`: a template returning SVG markup as a string renders the same PNG as the equivalent element.
+- [x] `TestCardScale`: `data({ scale: 2 })` produces a 2400 by 1260 PNG; `scale: 5` and `width="5000"` fail with errors.
+- [x] `TestCardFonts`: text in a test font loaded from `testdata/` as TTF and as WOFF2 renders identical glyph pixels, and system fonts are never used.
+- [x] `TestCardUnknownFont`: a `font-family` naming no loaded family fails the build with the family named in the error.
+- [x] `TestCardImages`: `<image>` with a root-relative site path and with a `data:` URI renders; `https:`, `file:`, relative, `..`, and symlinked-out paths fail.
+- [x] `TestCardDeterministic`: two builds produce byte-identical PNGs.
+- [x] `TestMeasureText`: widths match the rendered text's extent within a pixel, weight changes the width, and an unknown family throws.
+- [x] `TestServeCard`: `serve` answers `/about.card.png` with `Content-Type: image/png`, and editing a font file or the template changes the next response.
+- [x] `TestCardNoEngine`: building a site with no raster output never compiles the module.
+- [x] CI rebuilds the resvg module from source and it matches the committed file.
+- [x] `make dist` builds for every release target with `CGO_ENABLED=0`, and a linux-386 build renders `TestCardPNG` correctly.
+- [x] The `web/` site adds `_outputs/card.png.jsx`, a font under `_assets/`, and `og:image` tags, and `make web-build` writes the cards.
+- [x] The spec describes raster outputs, font loading, `measureText`, and the new dependency.
 
 ## Implementation
 
@@ -221,3 +221,12 @@ The embedded `.wasm` is a binary in the repository. It's built from source in th
 - Should `serve` expose the SVG a card was rendered from, for example at `/about.card.png?svg`, to make debugging a layout faster?
 - Builds now start clean, so every card is rasterized on every build. If that's slow for a large site, a cache keyed by a hash of the SVG and fonts could live outside `_public/`. Measure before adding it.
 - JPEG or WebP outputs would reuse everything here except the encoder. Left out until a site needs one.
+
+## Updates
+
+- 2026-11-12: The two font questions from Open issues are answered by rendering the redesign's fonts with the pinned resvg 0.50.
+  Recursive's `CASL`, `MONO`, `slnt`, and `CRSV` axes all render through `font-variation-settings`, and `font-weight` maps to `wght`, so the site's single variable font file works for cards and no static instances are needed.
+  Two caveats: `font-weight` above 900 is ignored, so heavier weights need `font-variation-settings: "wght" 1000`; and `font-style="italic"` does nothing for Recursive, which has a `slnt` axis but no `ital` axis, so sloped text needs `"slnt" -15` or `font-style="oblique"`.
+  Recursive Sans keeps the same advance widths at every weight, so `measureText` returns the same width for any `weight` with it; that's the font, not the engine.
+- 2026-11-12: Silkscreen draws on a grid of 125 units per pixel at 1000 units per em, so it is 8 pixels per em. At sizes that are multiples of 8 (16, 24, 32, 40, 48), with whole-pixel `x` and `y`, it renders with essentially no antialiased pixels even by default. At other sizes, `text-rendering="optimizeSpeed"` turns antialiasing off, which removes the gray but makes its pixels uneven. Use multiples of 8.
+- 2026-11-12: Implementation notes where the build differs from the text above. WOFF and WOFF2 are decoded inside the WebAssembly module with the `wuff` crate, not in Go, which keeps the Go dependencies to wazero alone and parses the compressed font data inside the sandbox. Unknown font families are caught by a font selector inside the module rather than by `encoding/xml`, so families set through CSS inheritance or `style` are checked too; `encoding/xml` still checks the root size and collects image references. The module returns pixels and Go encodes the PNG, because deflate in WebAssembly made a 1200 by 630 card take about 500 ms. `letterSpacing` is added between letters but not after the last, matching the rendered text.
