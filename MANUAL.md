@@ -6,8 +6,21 @@ taragen turns the folder into a website. There is no config file, no Node.js, an
 no `node_modules`: the file tree is the configuration, and JSX runs in a
 JavaScript engine built into the binary.
 
+Why taragen:
+
+- **Write in the format that fits.** Markdown for writing, JSX for pages with
+  logic, Go templates if you like them, all in the same site.
+- **Components without a framework.** JSX layouts and partials let you build a
+  site from reusable pieces, rendered to plain HTML with nothing shipped to the
+  browser.
+- **Live reloading.** `taragen serve` notices every change and refreshes the
+  browser for you.
+- **One binary.** Install it and you're done. Nothing to `npm install`, nothing
+  to keep updated.
+
 This manual is for people building sites with taragen. It covers every feature,
-from a first page to generated archives, backlinks, redirects, and share cards.
+from a first page to generated archives, backlinks, redirects, and share cards,
+and ends with [tutorials](#tutorials) that put them together.
 
 ## Contents
 
@@ -35,8 +48,9 @@ from a first page to generated archives, backlinks, redirects, and share cards.
 22. [Code highlighting](#code-highlighting)
 23. [Building and deploying](#building-and-deploying)
 24. [Serve mode and live reload](#serve-mode-and-live-reload)
-25. [Errors and troubleshooting](#errors-and-troubleshooting)
-26. [Reference](#reference)
+25. [Tutorials](#tutorials)
+26. [Errors and troubleshooting](#errors-and-troubleshooting)
+27. [Reference](#reference)
 
 ## Install
 
@@ -202,7 +216,15 @@ Pages without an extension get clean URLs: they're written as
 extension, like `feed.xml.jsx`, is written as-is.
 
 `about.jsx` and `about/index.jsx` are the same page. Use the folder form when a
-page has files of its own, like images, next to it.
+page has files of its own, like images, next to it. Blog posts are just pages,
+and a post with several images or downloads reads well as a folder:
+
+```
+articles/2021/ngrok/
+├── index.md          the post, at /articles/2021/ngrok
+├── diagram.png       linked from the post as diagram.png
+└── tunnel.go
+```
 
 ### Folders as pages
 
@@ -306,7 +328,7 @@ level becomes an export, so write `siteTitle = "My site"`, not `export` or
 ```js
 // _globals.jsx
 siteTitle = "My site";
-formatDate = (d) => new Date(d).toLocaleDateString("en-US", { dateStyle: "long" });
+greeting = <strong>Hello!</strong>;
 wrap = (text, font, width) => text.split(" ").reduce((lines, word) => {
   const last = lines[lines.length - 1];
   if (last && measureText(`${last} ${word}`, font) <= width) lines[lines.length - 1] = `${last} ${word}`;
@@ -318,7 +340,16 @@ wrap = (text, font, width) => text.split(" ").reduce((lines, word) => {
 **`_globals.jsx`** defines names that every JSX file in its folder and below can
 use: pages, layouts, partials, and output templates. Use it for site constants
 and helper functions. Globals files run from the root down, so a nested
-`_globals.jsx` sees and can override what its parents defined.
+`_globals.jsx` sees and can override what its parents defined. Nested globals
+are merged, so to hide a parent's global in a section, set it to `undefined` in
+that section's `_globals.jsx`.
+
+Since globals files are JSX, a global can be markup, like `greeting` above, and
+used anywhere as `{greeting}`.
+
+Globals are for JSX. Markdown and Go template pages can't read them directly;
+to use one there, wrap it in a JSX partial and include the partial with
+`[[ partial "_partials/name" ]]`.
 
 **`_defaults.jsx`** sets default page data for every page in its folder and
 below. Its exports are merged into each page's data before the page's own
@@ -396,21 +427,44 @@ pages want.
 
 A layout can also set `layout` (with `data()` in JSX, or frontmatter in a
 template layout). When it does, the remaining folder layouts are dropped and the
-named layout is applied next. This lets one layout hand off to a specific chain.
+named layout is applied next. This lets one layout hand off to a specific chain:
+
+```jsx
+// about/_layout.jsx
+data({ layout: "_layouts/wide" });
+(content) => <div class="about">{content}</div>
+```
 
 Go template layouts (`_layout.tmpl`) get the content through `[[ content ]]`.
 
 ## Partials
 
-Any `_name.jsx` or `_name.tmpl` file that isn't one of the special files above is
-a partial. Include it from JSX with its path from the site root, without the
+Partials are reusable pieces of markup you can include in pages, layouts, and
+other partials. Any `_name.jsx` or `_name.tmpl` file that isn't one of the
+special files above is a partial, and so is any `.jsx` or `.tmpl` file inside an
+`_`-prefixed folder. Most sites keep them together in a root `_partials/`
+folder, where the files don't need their own underscore.
+
+Include a partial from JSX with its path from the site root, without the
 extension:
 
 ```jsx
 {partial("_partials/footer")}
 ```
 
-A partial can be a plain element, or a function that takes arguments:
+A navigation partial:
+
+```jsx
+// _partials/nav.jsx
+<ul>
+  <li><a href="/">Home</a></li>
+  <li><a href="/articles">Articles</a></li>
+  <li><a href="/about">About</a></li>
+</ul>
+```
+
+A partial can be a plain element, as above, or a function. Arguments after the
+name are passed to the function:
 
 ```jsx
 // _partials/card.jsx
@@ -429,7 +483,7 @@ Partials see the same globals and `page` as the file that calls them. `.jsx` is
 tried first, then `.tmpl`. A missing partial, or one that throws, fails the page
 with an error naming it.
 
-In Go templates, use `[[ partial "_partials/footer" ]]`. Template partials
+In Markdown and Go templates, use `[[ partial "_partials/footer" ]]`. Template partials
 (`.tmpl`) currently receive no helper functions and ignore arguments, so prefer
 JSX partials.
 
@@ -1399,6 +1453,333 @@ backlinks, and aliases appear on the next reload.
 
 Requests are rendered one at a time. That's fine for local preview; use
 `build` for production.
+
+## Tutorials
+
+These walk through common tasks from start to finish. Each one links back to
+the sections above for the details.
+
+### Set up a blog
+
+Posts are ordinary pages. Grouping them in year folders keeps the tree tidy and
+gives you a natural archive.
+
+1. Create an `articles/` folder with a folder for the current year, and a post
+   in it, `articles/2025/hello-world.md`:
+
+   ```markdown
+   ---
+   title: Hello, world
+   date: 2025-01-01
+   description: The first post.
+   ---
+
+   This is my first post.
+   ```
+
+   The `date` orders posts in listings, and a date in the future keeps a post
+   out of `build` until that day (see [Drafts](#drafts)).
+
+2. Give posts a frame with `articles/_layout.jsx`. It wraps every page in
+   `articles/`, and the root layout wraps the result:
+
+   ```jsx
+   (content) =>
+   <article class="post">
+     <h1>{page.title}</h1>
+     <time>{page.date}</time>
+     {content}
+   </article>
+   ```
+
+3. Add the blog's front page, `articles/index.jsx`, listing posts by year,
+   newest first. Year folders have no index file of their own, so they're
+   grouping nodes with `isDir` set and their posts in `subpages`:
+
+   ```jsx
+   data({ title: "Articles", layout: "_layout" });
+   <h1>Articles</h1>
+   {pages("articles").filter(p => p.isDir).reverse().map(year =>
+     <section>
+       <h2>{year.slug}</h2>
+       <ul>
+         {year.subpages.slice().reverse().map(post =>
+           <li><time>{post.date}</time> <a href={post.path}>{post.title}</a></li>
+         )}
+       </ul>
+     </section>
+   )}
+   ```
+
+   Setting `layout: "_layout"` uses only the root layout for this page, since
+   the post layout would add a stray date heading.
+
+   For a flat list instead, one call reaches every post however it's nested:
+
+   ```jsx
+   {pages("articles/**").reverse().map(post => partial("_partials/card", post))}
+   ```
+
+4. Add a feed. `articles/feed.xml.jsx` builds `/articles/feed.xml`; the full
+   template is in [Non-HTML pages and feeds](#non-html-pages-and-feeds). Set
+   `siteURL` in your root `_defaults.jsx` so the feed can build absolute links,
+   and advertise the feed from the root layout's `<head>`:
+
+   ```jsx
+   <link rel="alternate" type="application/rss+xml" title="Articles" href="/articles/feed.xml" />
+   ```
+
+5. Run `taragen serve` and open `/articles`.
+
+### Add tag pages
+
+Tag posts in frontmatter with `tags: [go, networking]`. Then one template makes
+a page for every tag in use, `tags/[tag].jsx`:
+
+```jsx
+params(() => [...new Set(pages("articles/**").flatMap(p => p.tags ?? []))].map(tag => ({ tag })));
+data({ title: `Tagged “${page.params.tag}”` });
+<>
+  <h1>{page.title}</h1>
+  <ul>
+    {pages({ path: "articles/**", where: { tags: page.params.tag } }).reverse().map(p =>
+      <li><a href={p.path}>{p.title}</a></li>
+    )}
+  </ul>
+</>
+```
+
+A tag index, `tags/index.jsx`, lists the generated pages, since page bodies run
+after every page exists:
+
+```jsx
+data({ title: "Tags" });
+<ul>{pages("tags").map(t => <li><a href={t.path}>{t.slug}</a></li>)}</ul>
+```
+
+Link each post's tags from the post layout:
+
+```jsx
+{page.tags?.map(t => <a class="tag" href={`/tags/${t}`}>{t}</a>)}
+```
+
+To give one tag a hand-written page, add `tags/go.md`; it replaces the
+generated `/tags/go` and every other tag keeps its generated page. See
+[Generated pages](#generated-pages).
+
+### Add yearly archive pages
+
+The year folders from the blog tutorial have no page of their own, so `/articles/2025`
+is a 404. A template named `index.jsx` inside a bracketed folder fills them in,
+`articles/[year]/index.jsx`:
+
+```jsx
+params(() => pages("articles/**").filter(p => p.date).map(p => ({ year: p.date.slice(0, 4) })));
+data({ title: `Articles from ${page.params.year}` });
+<ul>
+  {pages(`articles/${page.params.year}`).reverse().map(p =>
+    <li><a href={p.path}>{p.title}</a></li>
+  )}
+</ul>
+```
+
+Each generated year page takes over the year's grouping node and keeps its
+posts as `subpages`. Because these pages now have a source, `pages("articles/**")`
+includes them; streams that want only posts add `.filter(p => !p.params)`.
+
+### Build a docs section with a sidebar
+
+Put docs pages in `docs/`, with subsections as folders, and give the section a
+layout that lists its pages:
+
+```jsx
+// docs/_layout.jsx
+(content) =>
+<>
+  <nav class="sidebar">
+    <ul>
+      {pages("docs").map(p =>
+        <li>
+          <a href={p.path}>{p.title}</a>
+          {p.isDir && p.subpages.length > 0 &&
+            <ul>{p.subpages.map(sub => <li><a href={sub.path}>{sub.title}</a></li>)}</ul>}
+        </li>
+      )}
+    </ul>
+  </nav>
+  <section>
+    <h1>{page.title}</h1>
+    {content}
+  </section>
+</>
+```
+
+Pages without a `date` sort by slug, so to control the order, prefix file names
+(`01-install.md`) or sort in the layout by a key of your own, such as `order`
+in frontmatter:
+
+```jsx
+pages("docs").sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
+```
+
+A subsection index, such as `docs/tutorials/index.jsx`, lists its own pages:
+
+```jsx
+data({ title: "Tutorials" });
+<ul>{pages("docs/tutorials").map(p => <li><a href={p.path}>{p.title}</a></li>)}</ul>
+```
+
+If `docs/` has no index page, send `/docs` straight to the first page with a
+line in `_redirects`, instead of writing a redirect page by hand:
+
+```
+/docs   /docs/getting-started   302
+```
+
+### Highlight the current page in navigation
+
+`page` in a partial is the page being rendered, so a nav partial can compare
+each link with `page.path`:
+
+```jsx
+// _partials/nav.jsx
+() => {
+  const link = (href, text) =>
+    <a class={page.path === href || page.path.startsWith(href + "/") ? "selected" : ""} href={href}>{text}</a>;
+  return (
+    <ul>
+      <li>{link("/", "Home")}</li>
+      <li>{link("/articles", "Articles")}</li>
+      <li>{link("/about", "About")}</li>
+    </ul>
+  );
+}
+```
+
+The `startsWith` check keeps "Articles" selected on every post. An empty class
+is left out of the output, so unselected links have no `class` attribute. Style
+it in your CSS:
+
+```css
+nav .selected { font-weight: bold; }
+```
+
+Include it in a layout with `{partial("_partials/nav")}`.
+
+### Format dates
+
+`date` is a `YYYY-MM-DD` string. Add a formatter to your root `_globals.jsx`:
+
+```js
+formatDate = (date, format = "MM/dd/yyyy") => {
+  const d = new Date(date);
+  const map = {
+    yyyy: String(d.getUTCFullYear()),
+    MM: String(d.getUTCMonth() + 1).padStart(2, "0"),
+    dd: String(d.getUTCDate()).padStart(2, "0"),
+  };
+  return format.replace(/yyyy|MM|dd/g, m => map[m]);
+};
+```
+
+and use it in any JSX:
+
+```jsx
+<time datetime={page.date}>{formatDate(page.date, "dd.MM.yyyy")}</time>
+```
+
+The UTC methods matter: `new Date("2025-01-01")` is midnight UTC, and local
+time methods would show the previous day west of Greenwich.
+
+To use a global in a Markdown page, wrap it in a partial, such as
+`_partials/today.jsx` containing `<span>{formatDate(new Date())}</span>`, and
+include it with `[[ partial "_partials/today" ]]`.
+
+### Offer a plain-text version of every page
+
+Add `_outputs/txt.jsx`:
+
+```jsx
+data({ contentType: "text/plain; charset=utf-8" });
+`${page.title ?? page.date}\n\n${page.src}`
+```
+
+Every HTML page now has a `.txt` twin, `/about` beside `/about.txt`, holding
+its title and raw source. Link it from the root layout:
+
+```jsx
+{page.outputs?.txt && <a href={page.outputs.txt}>Plain text</a>}
+```
+
+Turn it off where it makes no sense with `outputs: { txt: false }` in a page's
+frontmatter, or for a whole folder in its `_defaults.jsx`. See
+[Extra outputs per page](#extra-outputs-per-page).
+
+### Add share cards
+
+1. Put the font files you want on cards in the site, for example
+   `_assets/fonts/Inter-Bold.ttf`. The same files can serve your CSS.
+2. Add the `wrap` helper from [Defaults and globals](#defaults-and-globals) to
+   `_globals.jsx`.
+3. Create `_outputs/card.png.jsx`, returning a 1200×630 `<svg>` like the
+   example in [Share cards](#share-cards), with `font-family="Inter"`.
+4. Point the root layout's `<head>` at it:
+
+   ```jsx
+   {page.outputs?.card && <meta property="og:image" content={`${page.siteURL}${page.outputs.card}`} />}
+   ```
+
+5. With `taragen serve` running, open `/about.card.png` in the browser. Each
+   save reloads it, so you can tune the layout by eye.
+
+If a page should share a different image, set `outputs: { card: false }` and
+write your own `og:image` tag for it.
+
+### Show what links to a page
+
+Add a "Linked from" list to the post layout:
+
+```jsx
+{page.backlinks.length > 0 && <aside>
+  <h2>Linked from</h2>
+  <ul>{page.backlinks.map(p => <li><a href={p.path}>{p.title}</a></li>)}</ul>
+</aside>}
+```
+
+Only links in page bodies count, not nav or footer links, so the list shows
+real references. Set `siteURL` if your posts link to each other with full
+URLs. See [Backlinks](#backlinks).
+
+### Move a section without breaking links
+
+To rename `blog/` to `articles/`:
+
+1. Move the folder.
+2. Add `articles/_defaults.jsx` so every page answers at its old URL too:
+
+   ```js
+   aliases = [page.path.replace(/^\/articles/, "/blog")];
+   ```
+
+3. Build. `/blog/2021/ngrok` gets a redirect page to `/articles/2021/ngrok`,
+   `/blog` redirects to `/articles`, and the old feed URL `/blog/feed.xml` keeps
+   serving the feed itself, so subscribers don't notice. Old pages are gone from
+   `_public/` because every build starts clean.
+
+On a host that reads `_redirects`, you can add `/blog/* /articles/:splat` too,
+for real 301s. See [Aliases and redirects](#aliases-and-redirects).
+
+### Style code blocks
+
+Fenced code in Markdown comes out with Chroma classes and no colors. Generate a
+stylesheet for a theme you like:
+
+```sh
+hugo gen chromastyles --style=monokai > _assets/chroma.css
+```
+
+or with Chroma's own CLI, and link it from your layout. Or write a few rules
+yourself; see [Code highlighting](#code-highlighting).
 
 ## Errors and troubleshooting
 

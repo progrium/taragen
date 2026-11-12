@@ -17,7 +17,9 @@ taragen serve     # preview at http://localhost:8088 with live reload
 taragen build     # write the site to _public/
 ```
 
-**Read the [manual](MANUAL.md)** for a full guide to building sites.
+**Read the [manual](MANUAL.md)** for a full guide to building sites, with
+[tutorials](MANUAL.md#tutorials) for blogs, tag pages, docs sections, share
+cards, and more.
 
 ## Features
 
