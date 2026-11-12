@@ -4,6 +4,7 @@ This spec describes taragen as built: its architecture, the main components, how
 a build or request flows through them, and the decisions (and known rough edges)
 baked into the current code. It describes what exists, never unbuilt features.
 Changes to it go through proposals; see [the design process](design/README.md).
+Its starting point is frozen in the [baseline](design/baseline.md) proposal.
 
 ## Overview
 
