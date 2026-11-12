@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 	"sync"
 
@@ -24,22 +25,56 @@ func watchForReloads(dir string, s *Site) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	root := strings.Trim(dir, "/")
 	for event := range w.Iter() {
-		if strings.HasSuffix(event.Path, ExtMarkdown) ||
-			strings.HasSuffix(event.Path, ExtJSX) ||
-			strings.HasSuffix(event.Path, ExtTemplate) ||
-			event.IsDir() {
+		rel := strings.TrimPrefix(strings.TrimPrefix(event.Path, root), "/")
+		reparse, reload := classifyChange(rel, event.IsDir())
+		if !reload {
+			continue
+		}
+		if reparse {
+			if err := s.ParseAll(); err != nil {
+				log.Println("parse:", err)
+			}
+		}
+		reloaders.Range(func(key, value any) bool {
+			if conn, ok := key.(*websocket.Conn); ok {
+				conn.Close()
+			}
+			return true
+		})
+	}
+}
 
-			s.ParseAll()
-
-			reloaders.Range(func(key, value any) bool {
-				if conn, ok := key.(*websocket.Conn); ok {
-					conn.Close()
-				}
-				return true
-			})
+// classifyChange decides what a change to rel (a path relative to the site
+// root) needs. Any file in the site reloads the browser, so CSS and other
+// static edits show up. Page sources and directories also re-parse the site
+// to pick up new and removed pages. Dot-prefixed paths and the build output
+// in _public are ignored.
+func classifyChange(rel string, isDir bool) (reparse, reload bool) {
+	if rel == "" {
+		return true, true
+	}
+	parts := strings.Split(rel, "/")
+	if parts[0] == "_public" {
+		return false, false
+	}
+	for _, part := range parts {
+		if strings.HasPrefix(part, ".") {
+			return false, false
 		}
 	}
+	// a deleted directory can't be stat'd, so treat extensionless names as
+	// possible directories
+	if isDir || path.Ext(parts[len(parts)-1]) == "" {
+		return true, true
+	}
+	for ext := range Formats {
+		if strings.HasSuffix(rel, ext) {
+			return true, true
+		}
+	}
+	return false, true
 }
 
 func injectLiveReload(w io.Writer, buf bytes.Buffer) {

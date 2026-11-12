@@ -123,6 +123,18 @@ You can also use partials in Markdown using Go template syntax:
 [[ "[[ partial \"_partial/nav\" ]]" ]]
 ```
 
+## Escaping
+
+Text and attribute values in JSX are HTML-escaped, so a title like `Tips & Tricks` or a value with quotes is safe to drop into `{page.title}` or `content={page.title}`. Text inside `<script>` and `<style>` is left as written.
+
+Partials and the `content` a layout receives are already HTML, so they are inserted as is. Any other HTML string, such as another page's `body` from `pages()`, needs `raw()` to be inserted unescaped:
+
+```
+<div class="excerpt">{raw(post.body)}</div>
+```
+
+If a partial fails, the error fails the render (and `taragen build`) instead of showing up in the page.
+
 ## Globals
 
 A file called `_globals.jsx` can define variables and helper functions that will be available in all JSX files. 

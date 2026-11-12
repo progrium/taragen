@@ -21,9 +21,12 @@ func builtinGlobals(p *Page) map[string]any {
 			}
 			partial, err := p.site.Partial(name, p.globals, args...)
 			if err != nil {
-				return runtime.ToValue(err.Error())
+				// throw, so a broken partial fails the render instead of
+				// rendering its error message into the page
+				panic(runtime.NewGoError(fmt.Errorf("partial %s: %w", name, err)))
 			}
-			return runtime.ToValue(string(partial))
+			// partial output is already HTML, so it is inserted unescaped
+			return runtime.ToValue(rawNode(string(partial)))
 		},
 		"pages": func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
 			// Helper function to build page data with recursive subpages
@@ -85,18 +88,124 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 	return
 }
 
-func wrapJSX(data []byte) ([]byte, error) {
-	dataIdx := bytes.Index(data, []byte("data"))
-	if dataIdx == -1 {
-		return fragmentWrap(data), nil
+// wrapJSX wraps a page source in a fragment so it can have several root
+// elements. A leading `data({...})` statement is kept outside the fragment. It
+// is found by scanning the source, not by searching for the word "data", so
+// pages that only mention data in their content are wrapped whole.
+func wrapJSX(src []byte) ([]byte, error) {
+	start := skipSpaceAndComments(src, 0)
+	if !bytes.HasPrefix(src[start:], []byte("data")) {
+		return fragmentWrap(src), nil
 	}
-	dataTermIdx := bytes.Index(data, []byte(";"))
-	if dataTermIdx == -1 {
-		return nil, fmt.Errorf("expected data statement terminator (';') not found")
+	open := skipSpaceAndComments(src, start+len("data"))
+	if open >= len(src) || src[open] != '(' {
+		return fragmentWrap(src), nil
 	}
-	out := data[:dataTermIdx+1]
-	out = append(out, fragmentWrap(data[dataTermIdx+1:])...)
+	end, err := matchParen(src, open)
+	if err != nil {
+		return nil, err
+	}
+	end++ // past ')'
+	if next := skipSpaceAndComments(src, end); next < len(src) && src[next] == ';' {
+		end = next + 1
+	}
+	// the semicolon is required here: without it, `data(...)\n<>` would
+	// parse as a comparison
+	out := append([]byte{}, src[:end]...)
+	out = append(out, ";\n"...)
+	out = append(out, fragmentWrap(bytes.TrimLeft(src[end:], " \t\r\n"))...)
 	return out, nil
+}
+
+// skipSpaceAndComments returns the index of the first byte at or after i that
+// isn't whitespace or part of a JS comment.
+func skipSpaceAndComments(src []byte, i int) int {
+	for i < len(src) {
+		switch {
+		case src[i] == ' ' || src[i] == '\t' || src[i] == '\n' || src[i] == '\r':
+			i++
+		case bytes.HasPrefix(src[i:], []byte("//")):
+			nl := bytes.IndexByte(src[i:], '\n')
+			if nl == -1 {
+				return len(src)
+			}
+			i += nl + 1
+		case bytes.HasPrefix(src[i:], []byte("/*")):
+			end := bytes.Index(src[i+2:], []byte("*/"))
+			if end == -1 {
+				return len(src)
+			}
+			i += 2 + end + 2
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+// matchParen returns the index of the parenthesis closing the one at open,
+// skipping strings, template literals, and comments.
+func matchParen(src []byte, open int) (int, error) {
+	depth := 0
+	for i := open; i < len(src); i++ {
+		c := src[i]
+		switch {
+		case c == '"' || c == '\'' || c == '`':
+			j, err := skipString(src, i)
+			if err != nil {
+				return 0, err
+			}
+			i = j
+		case bytes.HasPrefix(src[i:], []byte("//")) || bytes.HasPrefix(src[i:], []byte("/*")):
+			i = skipSpaceAndComments(src, i) - 1
+		case c == '(' || c == '{' || c == '[':
+			depth++
+		case c == ')' || c == '}' || c == ']':
+			depth--
+			if depth == 0 {
+				if c != ')' {
+					return 0, fmt.Errorf("unbalanced data(...) statement")
+				}
+				return i, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("unterminated data(...) statement")
+}
+
+// skipString returns the index of the quote closing the string at i. Template
+// literal substitutions are skipped by brace matching.
+func skipString(src []byte, i int) (int, error) {
+	quote := src[i]
+	for j := i + 1; j < len(src); j++ {
+		switch {
+		case src[j] == '\\':
+			j++
+		case src[j] == quote:
+			return j, nil
+		case quote == '`' && bytes.HasPrefix(src[j:], []byte("${")):
+			depth := 0
+			for k := j + 1; k < len(src); k++ {
+				switch src[k] {
+				case '"', '\'', '`':
+					end, err := skipString(src, k)
+					if err != nil {
+						return 0, err
+					}
+					k = end
+				case '{':
+					depth++
+				case '}':
+					depth--
+				}
+				if depth == 0 {
+					j = k
+					break
+				}
+			}
+		}
+	}
+	return 0, fmt.Errorf("unterminated string in data(...) statement")
 }
 
 func fragmentWrap(data []byte) (out []byte) {
