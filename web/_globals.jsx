@@ -1,7 +1,7 @@
 siteTitle = "taragen"
 siteTagline = "static sites from one binary"
 siteDescription = "Taragen is a fast, minimal static site generator in a single binary."
-siteUrl = "https://taragen.xyz"
+siteUrl = "https://progrium.github.io/taragen"
 repoUrl = "https://github.com/progrium/taragen"
 
 // Docs pages sort by the order key in their frontmatter.

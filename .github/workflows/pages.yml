@@ -24,7 +24,11 @@ jobs:
       - run: go build -o "$RUNNER_TEMP/taragen" ./cmd/taragen
       - run: '"$RUNNER_TEMP/taragen" build'
         working-directory: web
-      - uses: actions/configure-pages@v5
+      - id: pages
+        uses: actions/configure-pages@v5
+      # The site links from the domain root; GitHub Pages serves it under
+      # /<repo>/, so prefix its URLs with that base path.
+      - run: tools/rebase-site.sh "${{ steps.pages.outputs.base_path }}" web/_public
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/_public
