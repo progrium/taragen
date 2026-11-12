@@ -1,5 +1,5 @@
 ---
-slug: build-and-render-fixes
+slug: build-fixes-01
 title: Build and render fixes
 status: implemented
 created: 2026-11-12
