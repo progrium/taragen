@@ -33,6 +33,7 @@ Both commands operate on the current working directory as the site root.
 | `routes.go` | `RouteTable`: every URL the site serves and the page, output, or static file that produces it. |
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
 | `outputs.go` | `Output`: `_outputs/` template lookup, opt-outs, `page.outputs`, and output rendering. |
+| `links.go` | The link pass: collecting `links` from page bodies, normalizing hrefs, and inverting them into `backlinks`. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
 | `query.go` | `pages()` queries: pattern matching with `**`, the object form with `where`, and the listing order. |
@@ -106,6 +107,9 @@ built-in meaning:
 | `contentType` | Defaults to `text/html`; served as the HTTP `Content-Type`. |
 | `preamble` | Text written before the output; defaults to `<!DOCTYPE html>` for HTML. |
 | `outputs` | Set by taragen to a map from output name to URL (see Outputs). A page sets it to `false`, or to a map with `false` entries, to turn outputs off. |
+| `links` | Set by taragen to the sorted URLs of the pages this page's body links to (see Links and backlinks). |
+| `backlinks` | Set by taragen to the data of the pages that link to this page, sorted like `pages()`. |
+| `siteURL` | The site's absolute origin, such as `https://example.com`; absolute links with this origin count as links to the site's own pages. Read, never written. |
 
 Any other keys (`title`, `description`, ...) are free-form and flow through to
 JSX and templates untouched.
@@ -298,11 +302,14 @@ having no frontmatter.
 4. Load defaults: collect `_defaults.jsx` the same way and merge their exports
    into page data.
 5. Find the output templates that apply and set `page.outputs`, applying any
-   opt-out the defaults set (see Outputs).
+   opt-out the defaults set (see Outputs). Set `links` and `backlinks` from the
+   link graph of the last `ParseAll`, or to empty lists before there is one.
 6. Store the source in `src`, run the format's parser, merge the returned data,
-   and store the result in `body`.
+   and store the result in `body`. A call to `pages()` while parsing marks the
+   page for the second pass in `ParseAll`.
 7. Set `page.outputs` again from the page's final data: empty unless the
    page's `contentType` is `text/html`, and without the outputs it turned off.
+   Set `links` and `backlinks` again, replacing any value the page set.
 
 ### Rendering a page
 
@@ -417,6 +424,42 @@ the table; `Route.Draft()` reports whether the route's page is a draft, and
 each mode applies its own draft rule. `Site.Routes()` returns the table from the
 last `ParseAll`.
 
+### Links and backlinks
+
+`ParseAll` ends with a link pass over the parsed pages and the route table:
+
+1. **Second parse.** Pages whose body called `pages()` during the first pass
+   saw only the pages parsed before them, so they are parsed again once every
+   page exists. Their links don't depend on walk order. The route table is
+   built after this pass.
+2. **Collect.** For each page route whose `contentType` is `text/html`, the
+   `href` of every `<a>` in its `body` (the format parser's output, before
+   layouts) is read with the `golang.org/x/net/html` tokenizer and normalized:
+   empty hrefs and schemes other than `http` and `https` are skipped; absolute
+   and protocol-relative URLs count only if their origin matches the page's
+   `siteURL`; relative hrefs resolve against the page's URL as `build`
+   publishes it (`<path>/` for extensionless pages and the root, `<path>` for
+   pages like `feed.xml`); then the query and fragment are dropped, `.` and
+   `..` segments and a trailing slash are removed, and the path is
+   percent-decoded.
+3. **Resolve.** A normalized path counts when the route table maps it to a
+   page route other than the linking page. Outputs, static files, unknown
+   paths, and self links (including fragment-only links) don't count. In
+   `build`, drafts are neither sources nor targets; in `serve` they are both.
+   Each target counts once per page, and `links` is the sorted list of target
+   URLs.
+4. **Invert.** Each page's `backlinks` is the list of pages whose `links`
+   contain it, ordered by `sortPages`. Each entry is a copy of the linking
+   page's data without `links`, `backlinks`, or `subpages`, so the structure
+   has no cycles.
+
+The graph is fixed at the end of `ParseAll`. `Render` re-parses a page but
+keeps the `links` and `backlinks` the link pass set, so a page that renders its
+own backlinks list doesn't feed links back into the graph. A page body or
+`pages()` call during `ParseAll` sees empty `backlinks`; during `Render`, which
+is where layouts run, it sees the full graph. In serve mode the watcher's
+`ParseAll` rebuilds the graph on every page change.
+
 ### Ordering
 
 Every listing, from `pages()` and from `subpages`, is sorted by `sortPages`
@@ -435,8 +478,9 @@ pages at the end.
 `taragen build` calls `NewSite(cwd, false).GenerateAll("_public", true)`:
 
 1. `ParseAll()` resets the page map, parses every page path found by `walk`
-   once each (a directory and its `index.*` file share one), and builds the
-   route table. A route collision stops the build.
+   once each (a directory and its `index.*` file share one), parses pages that
+   called `pages()` again, builds the route table, and builds the link graph.
+   A route collision stops the build.
 2. **Clean.** With `clobber` set, every entry in the destination is removed
    except dot-prefixed entries at its top level, so a checked-out deploy
    repository (`_public/.git`) survives. Renamed and deleted pages don't linger.
@@ -526,7 +570,7 @@ where noted.
   the output are not configurable yet (there is a TODO for the port).
 - **Template partials get no helpers.** `Site.Partial` renders `.tmpl` partials
   with no function map and ignores arguments, and the template `page` helper
-  assumes string values.
+  assumes string values, so `links` and `backlinks` are only usable from JSX.
 
 ## Build and release
 
@@ -542,7 +586,7 @@ where noted.
   Go 1.23.1 and an extra linux-386 target.
 - Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`,
   the page tests in `page_test.go`, the output and route table tests in
-  `outputs_test.go`, the build, serve, and watcher tests in `site_test.go` and
+  `outputs_test.go`, the link graph tests in `links_test.go`, the build, serve, and watcher tests in `site_test.go` and
   `serve_test.go`, and the design tooling tests.
 
 ## Design process tooling
@@ -572,4 +616,5 @@ and uses only Go and git:
 | `gopkg.in/yaml.v2` | Frontmatter parsing. |
 | `github.com/yosssi/gohtml` | HTML output formatting. |
 | `github.com/gorilla/websocket` | Live reload socket. |
+| `golang.org/x/net/html` | Tokenizing page bodies to collect links. |
 | `tractor.dev/toolkit-go` | CLI framework (`engine`, `cli`) and the `watchfs` file watcher. |

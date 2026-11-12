@@ -231,8 +231,8 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 	})
 }
 
-// ParseAll resets the page map, parses every page found by walk, and builds
-// the route table.
+// ParseAll resets the page map, parses every page found by walk, builds the
+// route table, and builds the link graph.
 func (s *Site) ParseAll() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -268,11 +268,23 @@ func (s *Site) ParseAll() error {
 		return err
 	}
 
+	// A body that called pages() saw only the pages parsed before it, so it
+	// is parsed again now that the whole page set exists, and its links
+	// don't depend on walk order.
+	for _, pagepath := range pagepaths {
+		if p := s.Page(pagepath); p.usesPages {
+			if err := p.Parse(); err != nil {
+				return err
+			}
+		}
+	}
+
 	routes, err := s.buildRoutes(pagepaths, statics)
 	if err != nil {
 		return err
 	}
 	s.routes = routes
+	s.linkPages()
 	return nil
 }
 
