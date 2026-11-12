@@ -1,5 +1,5 @@
 // Package design implements the proposal-driven design workflow described in
-// docs/design/README.md: parsing proposal frontmatter, validating proposals,
+// design/README.md: parsing proposal frontmatter, validating proposals,
 // and computing their state from git.
 package design
 

@@ -13,8 +13,8 @@ import (
 
 // Paths, relative to the repository root.
 const (
-	DesignDir    = "docs/design"
-	SpecPath     = "docs/spec.md"
+	DesignDir    = "design"
+	SpecPath     = DesignDir + "/SPEC.md"
 	SignersPath  = DesignDir + "/SIGNERS"
 	TemplateName = "TEMPLATE.md"
 )
@@ -22,6 +22,7 @@ const (
 // nonProposals are files in the design directory that aren't proposals.
 var nonProposals = map[string]bool{
 	"README.md":  true,
+	"SPEC.md":    true,
 	TemplateName: true,
 }
 

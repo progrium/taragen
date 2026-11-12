@@ -1,6 +1,6 @@
 # Agent guidance
 
-Rules for AI agents working in this repository. They restate [the design process](docs/design/README.md); where the two differ, the README wins.
+Rules for AI agents working in this repository. They restate [the design process](design/README.md); where the two differ, the README wins.
 
 ## Design changes
 
@@ -9,12 +9,12 @@ Rules for AI agents working in this repository. They restate [the design process
 - Refer to proposals by slug everywhere: `depends`, links, commits, and PRs. Never by issue number.
 - Never write progress into a proposal's body. Progress goes in `status`, `branch`, Done criteria checkboxes, and dated Updates notes.
 - Never edit an accepted proposal's body except to check or waive Done criteria items.
-- The spec (`docs/spec.md`) describes only what's built. Update it in the PR that finishes a proposal, never before.
+- The spec (`design/SPEC.md`) describes only what's built. Update it in the PR that finishes a proposal, never before.
 
 ## Signatures
 
 - Never add, copy, re-date, or remove a signature line.
-- Never run `go run ./tools/design sign` or edit `docs/design/SIGNERS`.
+- Never run `go run ./tools/design sign` or edit `design/SIGNERS`.
 - When a signed doc changes enough to need re-signing, say so in the PR description.
 
 ## Before opening a PR

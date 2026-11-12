@@ -13,19 +13,19 @@ branch: [main]
 
 ## Abstract
 
-Adopt a proposal-driven design process: one Markdown proposal per design change in `docs/design/`, a spec describing the system as built, a small in-repo tool (`tools/design`) that validates and summarizes proposals, and a CI check that enforces the rules.
+Adopt a proposal-driven design process: one Markdown proposal per design change in `design/`, a spec describing the system as built, a small in-repo tool (`tools/design`) that validates and summarizes proposals, and a CI check that enforces the rules.
 
 ## Background
 
 taragen's design decisions lived only in code and commit messages. There was no record of which behavior is intended, what's planned, or why alternatives were rejected, and nothing for AI agents working in the repository to follow.
-The [baseline](baseline.md) proposal and the [spec](../spec.md) capture the design as it stands; this proposal adds the process for changing it.
+The [baseline](baseline.md) proposal and the [spec](SPEC.md) capture the design as it stands; this proposal adds the process for changing it.
 
 ## Proposal
 
 Add the process described in the [design README](README.md):
 
-- `docs/spec.md` describes taragen as built, and is signed by whoever last reviewed it as a whole.
-- `docs/design/` holds the process README, `TEMPLATE.md`, `SIGNERS`, and one `<slug>.md` per proposal.
+- `design/SPEC.md` describes taragen as built, and is signed by whoever last reviewed it as a whole.
+- `design/` holds the process README, `TEMPLATE.md`, `SIGNERS`, and one `<slug>.md` per proposal.
 - Proposal frontmatter is a strict YAML subset with the keys, statuses, and computed states the README defines.
 - `tools/design` provides `list`, `ready`, `graph`, `new`, `log`, `sign`, and `check`, using only Go and git.
 - `design-check.yml` runs `check` on every PR.

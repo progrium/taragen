@@ -23,7 +23,7 @@ Both keys are ordinary page data, so they're visible to the page, its layouts, a
 ## Background
 
 A page knows nothing about the pages that link to it.
-Page data (see Page data in the [spec](../spec.md)) holds the page's own source, body, and frontmatter, and `pages()` returns other pages' data, but nothing relates one page to another except the directory tree.
+Page data (see Page data in the [spec](SPEC.md)) holds the page's own source, body, and frontmatter, and `pages()` returns other pages' data, but nothing relates one page to another except the directory tree.
 
 The progrium.xyz redesign shows a count like "3 logs link here" under each article, and a "linked from" list on each doc.
 Today a template could fake this by calling `pages("*")` and searching every other page's `body` for an `href`, but that is quadratic in the number of pages, runs again on every page render, and is fragile: it has to guess at relative links, trailing slashes, fragments, and absolute URLs on its own.

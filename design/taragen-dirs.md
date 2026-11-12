@@ -20,7 +20,7 @@ A directory that has both forms of the same file fails the build.
 
 ## Background
 
-A site's special files sit among its pages, marked by a `_` prefix (see Site and file conventions in the [spec](../spec.md)).
+A site's special files sit among its pages, marked by a `_` prefix (see Site and file conventions in the [spec](SPEC.md)).
 That keeps the file tree as the configuration, but a site root collects many of them.
 The example site in `web/` has six `_` entries at its root next to two pages, and the progrium.xyz redesign has seven:
 

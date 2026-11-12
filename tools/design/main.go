@@ -1,5 +1,5 @@
 // Command design runs taragen's proposal-driven design workflow. See
-// docs/design/README.md.
+// design/README.md.
 //
 //	go run ./tools/design <command> [flags]
 package main

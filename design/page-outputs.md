@@ -22,7 +22,7 @@ Each page gets a `page.outputs` map so layouts and listings can link to its extr
 
 ## Background
 
-Taragen writes exactly one file per page source (see Build mode in the [spec](../spec.md)).
+Taragen writes exactly one file per page source (see Build mode in the [spec](SPEC.md)).
 A page without an extension goes to `<path>/index.html`, and a page whose name keeps an extension, like `feed.xml.jsx`, goes to `feed.xml`.
 There is no way for one source to produce a second file.
 

@@ -134,8 +134,8 @@ The [manual](MANUAL.md) covers each of these in detail.
 ## Documentation
 
 - [MANUAL.md](MANUAL.md): the user guide for building sites.
-- [docs/spec.md](docs/spec.md): how taragen works inside, for contributors.
-- [docs/design/](docs/design/README.md): design proposals and the process for
+- [design/SPEC.md](design/SPEC.md): how taragen works inside, for contributors.
+- [design/](design/README.md): design proposals and the process for
   changing taragen.
 - [web/](web/): the taragen website, which is also an example site.
 
@@ -154,7 +154,7 @@ WebAssembly and embedded in the binary; only changing that module needs Rust
 (see its Makefile target).
 
 Changes to taragen's behavior go through a design proposal first; see
-[the design process](docs/design/README.md). Agents working in the repository
+[the design process](design/README.md). Agents working in the repository
 follow [AGENTS.md](AGENTS.md).
 
 ## License

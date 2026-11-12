@@ -16,7 +16,7 @@ A short summary. It becomes the body of the proposal's issue.
 
 ## Background
 
-The problem, and what exists today. Link the relevant parts of the [spec](../spec.md).
+The problem, and what exists today. Link the relevant parts of the [spec](SPEC.md).
 
 ## Proposal
 

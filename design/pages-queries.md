@@ -22,7 +22,7 @@ Listings also get a total order, so pages that share a date no longer come out i
 
 ## Background
 
-`pages(query)` is the only way a page reads other pages (see `pages(query)` under JSX in the [spec](../spec.md)).
+`pages(query)` is the only way a page reads other pages (see `pages(query)` under JSX in the [spec](SPEC.md)).
 It takes a string in one of two forms:
 
 - A plain path, such as `pages("docs")`, returns the subpages of that page: its direct children.

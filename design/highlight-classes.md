@@ -22,7 +22,7 @@ Taragen emits no colors at all; a site with no highlighting CSS shows code in it
 
 ## Background
 
-Markdown goes through goldmark with the `goldmark-highlighting` (Chroma) extension (see Markdown in the [spec](../spec.md)).
+Markdown goes through goldmark with the `goldmark-highlighting` (Chroma) extension (see Markdown in the [spec](SPEC.md)).
 `format_md.go` enables it with its defaults, so the Chroma `github` style is hard-coded and every token is colored with an inline `style` attribute.
 A fenced Go block renders today as:
 
