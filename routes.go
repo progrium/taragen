@@ -12,12 +12,17 @@ import (
 type RouteKind string
 
 const (
-	// RoutePage is a page with a source file.
+	// RoutePage is a page with a source file, or a page generated from a
+	// template.
 	RoutePage RouteKind = "page"
 	// RouteOutput is an output of a page, from an _outputs template.
 	RouteOutput RouteKind = "output"
 	// RouteStatic is a file copied verbatim.
 	RouteStatic RouteKind = "static"
+	// RouteAlias is an old URL of a page, from its aliases.
+	RouteAlias RouteKind = "alias"
+	// RouteRedirect is a redirect from the _redirects file.
+	RouteRedirect RouteKind = "redirect"
 )
 
 // Route is one URL the site serves and what produces it.
@@ -29,12 +34,17 @@ type Route struct {
 	// File is where build writes the route, relative to the output
 	// directory, such as "index.html" or "about/index.html".
 	File string
-	// Page is the page for page and output routes.
+	// Page is the page for page, output, and alias routes. For a redirect
+	// route it is the page a stub or copy is written for, if any.
 	Page *Page
 	// Output is the output for output routes.
 	Output *Output
 	// Source is the absolute source filename for static routes.
 	Source string
+	// Target is where an alias or redirect route points.
+	Target string
+	// Rule is the _redirects rule for redirect routes.
+	Rule *RedirectRule
 }
 
 // Draft reports whether the route is a draft: a draft page or an output of
@@ -47,9 +57,16 @@ func (r *Route) Draft() bool {
 func (r *Route) String() string {
 	switch r.Kind {
 	case RoutePage:
+		if r.Page.template != "" {
+			return fmt.Sprintf("generated page %s (%s)", r.URL, r.Page.template)
+		}
 		return fmt.Sprintf("page %s (%s)", r.URL, r.Page.file)
 	case RouteOutput:
 		return fmt.Sprintf("output %s of page %s (%s)", r.Output.Name, r.Page.URL(), r.Output.Template)
+	case RouteAlias:
+		return fmt.Sprintf("alias %s of page %s (%s)", r.URL, r.Page.URL(), r.Page.file)
+	case RouteRedirect:
+		return fmt.Sprintf("redirect %s (%s)", r.URL, r.Rule)
 	default:
 		return fmt.Sprintf("%s file %s", r.Kind, r.File)
 	}
@@ -128,9 +145,9 @@ func (s *Site) staticRoute(filename string) *Route {
 	return &Route{Kind: RouteStatic, URL: "/" + rel, File: rel, Source: filename}
 }
 
-// buildRoutes builds the route table from the parsed pages and the static
-// files found by walk.
-func (s *Site) buildRoutes(pagepaths []string, statics []string) (*RouteTable, error) {
+// buildRoutes builds the route table from the parsed pages, the static
+// files found by walk, and the _redirects rules.
+func (s *Site) buildRoutes(pagepaths []string, statics []string, redirectsFile string, rules []*RedirectRule) (*RouteTable, error) {
 	t := NewRouteTable()
 	for _, filename := range statics {
 		if err := t.Add(s.staticRoute(filename)); err != nil {
@@ -153,6 +170,23 @@ func (s *Site) buildRoutes(pagepaths []string, statics []string) (*RouteTable, e
 				return nil, err
 			}
 		}
+	}
+	// alias rows go in after every page, so an alias of one page that
+	// matches another page names both
+	for _, pagepath := range pagepaths {
+		p := s.pages[strings.TrimPrefix(pagepath, "/")]
+		if p == nil || len(p.Source()) == 0 {
+			continue
+		}
+		for _, alias := range p.aliases {
+			r := &Route{Kind: RouteAlias, URL: alias, File: urlFile(alias), Page: p, Target: p.URL()}
+			if err := t.Add(r); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if err := s.addRedirectRoutes(t, redirectsFile, rules); err != nil {
+		return nil, err
 	}
 	return t, nil
 }

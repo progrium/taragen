@@ -1,5 +1,6 @@
 ---
 title: Getting Started
+aliases: [/docs/install, /start]
 ---
 
 ## Install

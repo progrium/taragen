@@ -1,12 +1,12 @@
 ---
 slug: backlinks
 title: Backlinks
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: [page-outputs]
 areas: [site, data, jsx, serve]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Backlinks
@@ -142,19 +142,19 @@ The data it adds is other pages' data, which `pages()` already exposes to every 
 
 ## Done criteria
 
-- [ ] `TestLinksFromBody`: links in a page's body are collected, and links added by its layouts are not.
-- [ ] `TestLinksNormalize`: relative links from `foo` and `feed.xml`, `..` segments, trailing slashes, fragments, queries, and percent-encoding all resolve to the same target URL.
-- [ ] `TestLinksAbsolute`: `https://example.com/about` counts when `siteURL` is `https://example.com`, and doesn't when it is unset or different; `mailto:` and other schemes are skipped.
-- [ ] `TestLinksSkip`: self links, fragment-only links, links to static files, unknown paths, and page outputs like `/about.txt` don't count.
-- [ ] `TestLinksNonHTML`: a `feed.xml.jsx` linking to every post adds no backlinks.
-- [ ] `TestLinksListingPage`: a root `index.jsx` that lists posts with `pages()` links to every post, regardless of walk order.
-- [ ] `TestBacklinks`: `page.backlinks` holds referrers once each, sorted like `pages()`, without `links`, `backlinks`, or `subpages`, and is an empty list when nothing links in.
-- [ ] `TestBacklinksDrafts`: in `build`, drafts are neither sources nor targets; in `serve` they are both.
-- [ ] `TestBacklinksVisible`: a layout and a `pages()` call from another page's layout both see `backlinks`.
-- [ ] `TestBacklinksStable`: a page whose body renders its own backlinks list doesn't change the graph when rendered, and rendering twice gives the same output.
-- [ ] `TestServeBacklinks`: in `serve`, adding a link to page A and reloading shows A in the target's backlinks.
-- [ ] The `web/` site shows a "linked from" list on docs pages.
-- [ ] The spec describes `links`, `backlinks`, `siteURL`, and the link pass in `ParseAll`.
+- [x] `TestLinksFromBody`: links in a page's body are collected, and links added by its layouts are not.
+- [x] `TestLinksNormalize`: relative links from `foo` and `feed.xml`, `..` segments, trailing slashes, fragments, queries, and percent-encoding all resolve to the same target URL.
+- [x] `TestLinksAbsolute`: `https://example.com/about` counts when `siteURL` is `https://example.com`, and doesn't when it is unset or different; `mailto:` and other schemes are skipped.
+- [x] `TestLinksSkip`: self links, fragment-only links, links to static files, unknown paths, and page outputs like `/about.txt` don't count.
+- [x] `TestLinksNonHTML`: a `feed.xml.jsx` linking to every post adds no backlinks.
+- [x] `TestLinksListingPage`: a root `index.jsx` that lists posts with `pages()` links to every post, regardless of walk order.
+- [x] `TestBacklinks`: `page.backlinks` holds referrers once each, sorted like `pages()`, without `links`, `backlinks`, or `subpages`, and is an empty list when nothing links in.
+- [x] `TestBacklinksDrafts`: in `build`, drafts are neither sources nor targets; in `serve` they are both.
+- [x] `TestBacklinksVisible`: a layout and a `pages()` call from another page's layout both see `backlinks`.
+- [x] `TestBacklinksStable`: a page whose body renders its own backlinks list doesn't change the graph when rendered, and rendering twice gives the same output.
+- [x] `TestServeBacklinks`: in `serve`, adding a link to page A and reloading shows A in the target's backlinks.
+- [x] The `web/` site shows a "linked from" list on docs pages.
+- [x] The spec describes `links`, `backlinks`, `siteURL`, and the link pass in `ParseAll`.
 
 ## Implementation
 
@@ -169,3 +169,10 @@ The data it adds is other pages' data, which `pages()` already exposes to every 
 - Should links from a layout ever count, for example a "related" block a layout renders from page data? This proposal says no; a page that wants such links counted can render them in its body.
 - Should page-outputs be a hard dependency? Backlinks could resolve against `Site.pages` and ship first, then switch to the route table, at the cost of a second set of URL rules in the meantime.
 - Is `siteURL` the right name and place for the site's origin? page-outputs' share cards will also need an absolute URL for `og:image`, so the two should agree.
+
+## Updates
+
+2026-11-12: Implemented in `links.go`, with every Done criteria test in `links_test.go`.
+The route table is built after the second parse of listing pages rather than before it, so a listing's re-parse can't leave the table out of date; the link pass runs last.
+Only `page` routes count as link targets, chosen in one function, `linkTarget`, so a later route kind such as aliases or generated pages decides there whether links to it count.
+The open issues are answered as the proposal stands: links from layouts don't count, page-outputs stays a dependency, and `siteURL` is read from page data, where share-cards can read it too.

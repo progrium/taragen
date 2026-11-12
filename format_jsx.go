@@ -14,6 +14,12 @@ func builtinGlobals(p *Page) map[string]any {
 	return map[string]any{
 		"page":        p.data,
 		"measureText": measureTextFunc(p.site),
+		// a template's leading params(...) statements are run by the
+		// parameters pass and removed by wrapJSX, so any call that reaches
+		// the VM is misplaced
+		Params: func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
+			panic(runtime.NewGoError(fmt.Errorf("params() is only allowed as a leading statement of a template (a .jsx file with a bracketed name like [tag].jsx)")))
+		},
 		"partial": func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
 			name := call.Argument(0).String()
 			var args []any
@@ -30,6 +36,9 @@ func builtinGlobals(p *Page) map[string]any {
 			return runtime.ToValue(rawNode(string(partial)))
 		},
 		"pages": func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
+			// a body that reads other pages can change once every page is
+			// parsed, so ParseAll parses it again
+			p.usesPages = true
 			// Helper function to build page data with recursive subpages
 			var buildPageData func(*Page) map[string]any
 			buildPageData = func(page *Page) map[string]any {
@@ -78,6 +87,17 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 			}
 		}
 	}()
+	if p.template == "" {
+		calls, _, err := leadingCalls(p.Source())
+		if err != nil {
+			return nil, Data{}, err
+		}
+		for _, c := range calls {
+			if c.name == "params" {
+				return nil, Data{}, fmt.Errorf("%s: params() is only allowed in a template (a .jsx file with a bracketed name like [tag].jsx)", p.file)
+			}
+		}
+	}
 	// wrapping in fragment to allow for multiple root elements
 	// but also ensure partial and other jsx expressions render
 	src, err := wrapJSX(p.Source())
@@ -92,30 +112,67 @@ func (f *JSXParser) Parse(p *Page) (out []byte, data Data, err error) {
 	return
 }
 
+// leadingCall is a leading data(...) or params(...) statement of a JSX page.
+type leadingCall struct {
+	name       string // "data" or "params"
+	start, end int    // the statement's bytes, including any semicolon
+}
+
+// leadingCalls finds a JSX page's leading statements: the data(...) and
+// params(...) calls before anything else, after whitespace and comments. They
+// are found by scanning the source, not by searching for the words, so pages
+// that only mention them in their content have none. end is where the rest of
+// the source starts.
+func leadingCalls(src []byte) (calls []leadingCall, end int, err error) {
+	for {
+		start := skipSpaceAndComments(src, end)
+		name := ""
+		for _, n := range []string{"data", "params"} {
+			if bytes.HasPrefix(src[start:], []byte(n)) {
+				name = n
+			}
+		}
+		if name == "" {
+			return calls, end, nil
+		}
+		open := skipSpaceAndComments(src, start+len(name))
+		if open >= len(src) || src[open] != '(' {
+			return calls, end, nil
+		}
+		close, err := matchParen(src, open)
+		if err != nil {
+			return nil, 0, fmt.Errorf("%s(...) statement: %w", name, err)
+		}
+		stmtEnd := close + 1
+		if next := skipSpaceAndComments(src, stmtEnd); next < len(src) && src[next] == ';' {
+			stmtEnd = next + 1
+		}
+		calls = append(calls, leadingCall{name: name, start: start, end: stmtEnd})
+		end = stmtEnd
+	}
+}
+
 // wrapJSX wraps a page source in a fragment so it can have several root
-// elements. A leading `data({...})` statement is kept outside the fragment. It
-// is found by scanning the source, not by searching for the word "data", so
-// pages that only mention data in their content are wrapped whole.
+// elements. Leading data(...) and params(...) statements are kept outside the
+// fragment, in source order. A leading params(...) call is turned into a void
+// expression, since params() does nothing when a template renders and the
+// params global throws for every other call.
 func wrapJSX(src []byte) ([]byte, error) {
-	start := skipSpaceAndComments(src, 0)
-	if !bytes.HasPrefix(src[start:], []byte("data")) {
-		return fragmentWrap(src), nil
-	}
-	open := skipSpaceAndComments(src, start+len("data"))
-	if open >= len(src) || src[open] != '(' {
-		return fragmentWrap(src), nil
-	}
-	end, err := matchParen(src, open)
+	calls, end, err := leadingCalls(src)
 	if err != nil {
 		return nil, err
 	}
-	end++ // past ')'
-	if next := skipSpaceAndComments(src, end); next < len(src) && src[next] == ';' {
-		end = next + 1
+	if len(calls) == 0 {
+		return fragmentWrap(src), nil
 	}
 	// the semicolon is required here: without it, `data(...)\n<>` would
 	// parse as a comparison
 	out := append([]byte{}, src[:end]...)
+	for _, c := range calls {
+		if c.name == "params" {
+			copy(out[c.start:], "void  ")
+		}
+	}
 	out = append(out, ";\n"...)
 	out = append(out, fragmentWrap(bytes.TrimLeft(src[end:], " \t\r\n"))...)
 	return out, nil
@@ -168,13 +225,13 @@ func matchParen(src []byte, open int) (int, error) {
 			depth--
 			if depth == 0 {
 				if c != ')' {
-					return 0, fmt.Errorf("unbalanced data(...) statement")
+					return 0, fmt.Errorf("unbalanced parentheses")
 				}
 				return i, nil
 			}
 		}
 	}
-	return 0, fmt.Errorf("unterminated data(...) statement")
+	return 0, fmt.Errorf("unterminated statement")
 }
 
 // skipString returns the index of the quote closing the string at i. Template
@@ -209,7 +266,7 @@ func skipString(src []byte, i int) (int, error) {
 			}
 		}
 	}
-	return 0, fmt.Errorf("unterminated string in data(...) statement")
+	return 0, fmt.Errorf("unterminated string")
 }
 
 func fragmentWrap(data []byte) (out []byte) {
