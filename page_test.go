@@ -281,8 +281,8 @@ func TestDraftsAndOrdering(t *testing.T) {
 			t.Errorf("%s should not be built", name)
 		}
 	}
-	// dated pages sort by date; pages without one fall back to slug order
-	assertContains(t, readOut(t, dir, "index.html"), "<p>C,B,A,NoDate</p>")
+	// pages without a date come first, then dated pages oldest first
+	assertContains(t, readOut(t, dir, "index.html"), "<p>NoDate,C,B,A</p>")
 
 	withDrafts, err := render(t, dir, ".", true)
 	if err != nil {
@@ -358,7 +358,7 @@ func TestMoreErrorPaths(t *testing.T) {
 		"_assets/.git/x":    `skip`,
 		"blog/2024/deep.md": "---\ntitle: Deep\n---\nd\n",
 		"blog/a.md":         "---\ntitle: A\n---\na\n",
-		"list.jsx":          `<p>{pages("blog").map(p => p.title).join(",")}|{pages("[*").length}</p>`,
+		"list.jsx":          `<p>{pages("blog").map(p => p.title).join(",")}|{pages("x*").length}</p>`,
 	})
 	assertContains(t, mustRender(t, dir, "list"), "<p>,A|0</p>")
 

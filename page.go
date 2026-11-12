@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -33,21 +32,6 @@ type Page struct {
 	data    Data
 	site    *Site
 	globals map[string]any
-}
-
-func sortPages(pages []*Page) {
-	sort.Slice(pages, func(i, j int) bool {
-		dateI, dateJ := pages[i].Date(), pages[j].Date()
-		// If date is not empty, parse and compare it; otherwise, compare by slug
-		if dateI != "" && dateJ != "" {
-			timeI, errI := time.Parse("2006-01-02", dateI)
-			timeJ, errJ := time.Parse("2006-01-02", dateJ)
-			if errI == nil && errJ == nil {
-				return timeI.Before(timeJ)
-			}
-		}
-		return pages[i].Slug() < pages[j].Slug()
-	})
 }
 
 func getData[T any](data Data, key string, fallback T) T {
@@ -103,7 +87,9 @@ func (p *Page) Preamble() string {
 
 func (p *Page) Subpages() (subpages []*Page) {
 	for _, page := range p.site.pages {
-
+		if page == p {
+			continue // the root is in its own directory
+		}
 		if strings.HasPrefix(page.path, p.path+"/") || p.path == "." {
 			relPath := strings.TrimPrefix(page.path, p.path+"/")
 			if strings.Contains(relPath, "/") {

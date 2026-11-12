@@ -51,7 +51,10 @@ func builtinGlobals(p *Page) map[string]any {
 			}
 
 			// Convert pages to the new structure
-			pages := p.site.Pages(call.Argument(0).String())
+			pages, err := queryPages(p.site, call.Argument(0))
+			if err != nil {
+				panic(runtime.NewGoError(err))
+			}
 			result := make([]map[string]any, len(pages))
 			for i, page := range pages {
 				result[i] = buildPageData(page)
@@ -213,4 +216,34 @@ func fragmentWrap(data []byte) (out []byte) {
 	out = append(out, data...)
 	out = append(out, []byte("</>")...)
 	return
+}
+
+// queryPages runs a pages() call: a string is a path or pattern, and an
+// object is the object form with path and where. Errors name the query.
+func queryPages(site *Site, arg goja.Value) ([]*Page, error) {
+	obj, isObj := arg.(*goja.Object)
+	if !isObj {
+		pages, err := site.Pages(arg.String())
+		if err != nil {
+			return nil, fmt.Errorf("pages(%q): %w", arg.String(), err)
+		}
+		return pages, nil
+	}
+	exported := obj.Export()
+	fail := func(err error) ([]*Page, error) {
+		return nil, fmt.Errorf("pages(%s): %w", describeQuery(exported), err)
+	}
+	m, ok := exported.(map[string]any)
+	if !ok || obj.ClassName() != "Object" {
+		return fail(fmt.Errorf("query must be a string or an object"))
+	}
+	q, err := parsePageQuery(m)
+	if err != nil {
+		return fail(err)
+	}
+	pages, err := site.Query(q.paths, q.where)
+	if err != nil {
+		return fail(err)
+	}
+	return pages, nil
 }

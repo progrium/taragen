@@ -33,6 +33,7 @@ Both commands operate on the current working directory as the site root.
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
+| `query.go` | `pages()` queries: pattern matching with `**`, the object form with `where`, and the listing order. |
 | `format_md.go` | Markdown parser (template pass, then goldmark with syntax highlighting). |
 | `format_tmpl.go` | Go `text/template` parser, template helper funcs, `RenderTemplate`. |
 | `jsx.go` | JSX runtime: esbuild transform, goja VM setup, `hyper` element factory, HTML serialization. |
@@ -79,7 +80,8 @@ root. So `about.jsx` and `about/index.jsx` both become page `about`, and
 Pages live in `Site.pages`, a `map[string]*Page` keyed by normalized path.
 `Site.Page(path)` lazily creates an entry with `path` and `slug` seeded into its
 data. Directories without an index file still get a `Page` (with `isDir: true`
-and no source) so they can act as grouping nodes for `pages()` queries.
+and no source) so they can act as grouping nodes for `pages()` queries. A page
+is never in its own `subpages`, including the root.
 
 ### Page data
 
@@ -208,10 +210,43 @@ Built-in globals, added after user globals so they always win:
 - `raw(html)`: inserts an HTML string unescaped (see Escaping above). It is set
   in every JSX VM, including layouts and partials.
 - `pages(query)`: returns page data objects (each with a recursive `subpages`
-  array). A plain path returns the sorted subpages of that page. A query
-  containing `*` is matched with `path.Match` against every page path and
-  returns the subpages of each match, so `pages("blog/*")` returns posts nested
-  under year directories.
+  array), sorted as one listing (see Ordering). See Page queries below.
+
+### Page queries
+
+`pages()` takes a string or an object. Both are implemented in `query.go`.
+
+A string is a path or a pattern:
+
+- A plain path, such as `pages("docs")`, returns the subpages of that page.
+- A string containing `*` is a pattern. It returns the subpages of every page
+  whose path matches it; put another way, the pages whose parent matches. It is
+  matched one `/`-separated segment at a time with `path.Match` rules, so `*`,
+  `?`, and `[...]` never cross a `/`. The root's path is empty for matching, so
+  `pages("*")` returns the pages two levels deep, not the root's subpages.
+- A segment that is exactly `**` matches zero or more whole segments:
+  `pages("articles/**")` returns every page below `articles` at any depth,
+  `pages("**")` every page but the root, and `docs/**/api` matches at any
+  depth. `**` inside a longer segment (`a**`) is just two `*`s. Grouping nodes,
+  pages without a source, are left out of the results of a pattern with a `**`
+  segment; plain paths, `*` patterns, and `subpages` still return them.
+
+The object form is `pages({ path, where })`:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `path` | `"**"` | A path or pattern as above, or a list of them. A list returns the union of each one's result, once each, sorted as one listing. |
+| `where` | none | Page data keys to wanted values; a page is kept only when every key matches. |
+
+A `where` key matches when the wanted string, number, or boolean is strictly
+equal (as `===`) to the page's value or to an element of the page's list value,
+or, for a wanted list, when any element of it does. A page without the key never
+matches, and `where` never filters `subpages`.
+
+A page appears at most once in a result. A malformed pattern, an unknown key, a
+`path` that isn't a string or a list of strings, a `where` value that is an
+object or `null`, or an argument that is neither a string nor an object throws
+an error naming the query, which fails the render.
 
 ### Markdown
 
@@ -296,9 +331,16 @@ preamble + gohtml-formatted output
 
 ### Ordering
 
-`sortPages` orders by `date` ascending when both pages have a parseable
-`YYYY-MM-DD` date, otherwise by slug. Listings that want newest first call
-`.reverse()` in JSX.
+Every listing, from `pages()` and from `subpages`, is sorted by `sortPages`
+with one total order, so it comes out the same on every build:
+
+1. Pages without a valid `YYYY-MM-DD` `date` first, then dated pages, oldest
+   first.
+2. Pages with the same date, or both undated, by `slug`.
+3. Pages with the same slug by `path`.
+
+Listings that want newest first call `.reverse()` in JSX, which puts undated
+pages at the end.
 
 ## Build mode
 

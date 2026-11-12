@@ -11,7 +11,7 @@ data({
         <description>{siteDescription}</description>
         <language>en</language>
         <generator>Taragen</generator>
-        {pages("blog/*").map(post => (
+        {pages("blog/**").reverse().map(post => (
             <item>
                 <title>{post.title}</title>
                 <link>{`${siteUrl}${post.path}`}</link>

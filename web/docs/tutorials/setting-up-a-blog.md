@@ -1,5 +1,6 @@
 ---
 title: Setting up a blog
+tags: [blog, layouts]
 ---
 
 Create a blog directory in your root folder.
