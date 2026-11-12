@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Recursive and filtered pages() queries
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Let `pages()` list pages at any depth and filter them by page data, so a home stream or a tag hub is one call instead of several concatenated, re-sorted, and filtered listings.
