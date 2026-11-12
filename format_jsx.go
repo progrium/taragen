@@ -35,6 +35,9 @@ func builtinGlobals(p *Page) map[string]any {
 			return runtime.ToValue(rawNode(string(partial)))
 		},
 		"pages": func(call goja.FunctionCall, runtime *goja.Runtime) goja.Value {
+			// a body that reads other pages can change once every page is
+			// parsed, so ParseAll parses it again
+			p.usesPages = true
 			// Helper function to build page data with recursive subpages
 			var buildPageData func(*Page) map[string]any
 			buildPageData = func(page *Page) map[string]any {

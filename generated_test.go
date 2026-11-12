@@ -318,3 +318,20 @@ func TestServeGenerated(t *testing.T) {
 	}
 	assertContains(t, serve(t, site, "/tags/new").Body.String(), "<li>C</li>")
 }
+
+func TestGeneratedLinksAndAliases(t *testing.T) {
+	dir := writeSite(t, map[string]string{
+		"about.jsx":      "<p>{(page.backlinks ?? []).map(p => p.path).join(\",\")}</p>",
+		"tags/[tag].jsx": "params([{tag: \"go\"}]);\ndata({aliases: [`/t/${page.params.tag}`]});\n<a href=\"/about\">about</a>",
+		"index.jsx":      "<a href=\"/tags/go\">go</a>",
+	})
+	mustBuild(t, dir)
+	assertContains(t, readOut(t, dir, "about/index.html"), "/tags/go")
+	site := parsed(t, dir, false)
+	if got := site.Page("tags/go").data["backlinks"]; got == nil {
+		t.Error("a link to a generated page should make a backlink")
+	}
+	if rec := serve(t, site, "/t/go"); rec.Code != http.StatusMovedPermanently {
+		t.Errorf("alias of a generated page: status %d", rec.Code)
+	}
+}
