@@ -309,7 +309,8 @@ func (p *Page) Render(w io.Writer) (err error) {
 			isJSX = false
 		}
 		if isJSX {
-			out, err = RenderJSX(layoutPath, layoutSrc, p.globals, string(out))
+			// the content is rendered HTML, so the layout inserts it unescaped
+			out, err = RenderJSX(layoutPath, layoutSrc, p.globals, rawNode(string(out)))
 			if err != nil {
 				return err
 			}

@@ -3,8 +3,9 @@ package taragen
 import (
 	"bytes"
 	"fmt"
-	"log"
+	"html"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -23,7 +24,15 @@ func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
 	}
 
 	vm := goja.New()
-	if err := vm.Set("hyper", hyper); err != nil {
+	if err := vm.Set("hyper", hyperFunc(vm)); err != nil {
+		return nil, "", err
+	}
+	if err := vm.Set("raw", func(v goja.Value) hyperNode {
+		if goja.IsUndefined(v) || goja.IsNull(v) {
+			return rawNode("")
+		}
+		return rawNode(v.String())
+	}); err != nil {
 		return nil, "", err
 	}
 
@@ -75,12 +84,15 @@ func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]
 		}
 	}
 
-	var node hyperNode
-	err = vm.ExportTo(v, &node)
+	nodes, err := toNodes(vm, v, "")
 	if err != nil {
 		return nil, err
 	}
-	return []byte(replaceNewlines(node.String())), nil
+	var builder strings.Builder
+	for _, node := range nodes {
+		node.write(&builder, false)
+	}
+	return []byte(replaceNewlines(builder.String())), nil
 }
 
 func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any, error) {
@@ -112,33 +124,123 @@ func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any,
 	return out, nil
 }
 
-func hyper(tag string, attrs map[string]any, children ...any) hyperNode {
-	var nodes []hyperNode
-	for _, child := range children {
-		if child == nil {
-			continue
+// hyperFunc returns the JSX element factory for a VM. It reads attributes from
+// the JS object directly so they keep their source order, and reports bad
+// values as JS TypeErrors so they surface as render errors instead of panics.
+func hyperFunc(vm *goja.Runtime) func(call goja.FunctionCall) goja.Value {
+	return func(call goja.FunctionCall) goja.Value {
+		tag := call.Argument(0).String()
+		node := hyperNode{tag: tag}
+
+		if a := call.Argument(1); !goja.IsUndefined(a) && !goja.IsNull(a) {
+			obj := a.ToObject(vm)
+			for _, key := range obj.Keys() {
+				at, ok, err := toAttr(vm, key, obj.Get(key))
+				if err != nil {
+					panic(vm.NewTypeError(fmt.Sprintf("%s (in %s)", err, tag)))
+				}
+				if ok {
+					node.attrs = append(node.attrs, at)
+				}
+			}
 		}
-		switch c := child.(type) {
-		case []any:
-			nodes = append(nodes, hyper("", nil, c...).children...)
-		case hyperNode:
-			nodes = append(nodes, c)
-		case string:
-			nodes = append(nodes, hyperNode{text: c})
-		case int64:
-			nodes = append(nodes, hyperNode{text: fmt.Sprintf("%d", c)})
-		default:
-			log.Panicf("unsupported child type: %T (in %s)", child, tag)
+
+		for _, child := range call.Arguments[min(2, len(call.Arguments)):] {
+			nodes, err := toNodes(vm, child, tag)
+			if err != nil {
+				panic(vm.NewTypeError(err.Error()))
+			}
+			node.children = append(node.children, nodes...)
 		}
+		return vm.ToValue(node)
 	}
-	return hyperNode{tag: tag, attrs: attrs, children: nodes}
+}
+
+func toAttr(vm *goja.Runtime, key string, v goja.Value) (attr hyperAttr, ok bool, err error) {
+	if v == nil || goja.IsUndefined(v) || goja.IsNull(v) {
+		return attr, false, nil
+	}
+	switch vv := v.Export().(type) {
+	case string:
+		if vv == "" {
+			return attr, false, nil
+		}
+		return hyperAttr{name: key, value: vv}, true, nil
+	case int64, float64:
+		return hyperAttr{name: key, value: v.String()}, true, nil
+	case bool:
+		if !vv {
+			return attr, false, nil
+		}
+		return hyperAttr{name: key, bare: true}, true, nil
+	case map[string]any:
+		// assuming this is a style object
+		obj := v.ToObject(vm)
+		var style strings.Builder
+		for _, k := range obj.Keys() {
+			sv := obj.Get(k)
+			if goja.IsUndefined(sv) || goja.IsNull(sv) {
+				continue
+			}
+			style.WriteString(k + ":" + sv.String() + ";")
+		}
+		return hyperAttr{name: key, value: style.String()}, true, nil
+	default:
+		return attr, false, fmt.Errorf("unsupported attr type for %s: %T", key, vv)
+	}
+}
+
+// toNodes converts a JS value used as a child (or a render result) to nodes.
+// Strings become escaped text, numbers are formatted the way JS prints them,
+// and null, undefined, and booleans render nothing, so `{cond && <x/>}` works.
+func toNodes(vm *goja.Runtime, v goja.Value, parent string) ([]hyperNode, error) {
+	if v == nil || goja.IsUndefined(v) || goja.IsNull(v) {
+		return nil, nil
+	}
+	switch c := v.Export().(type) {
+	case hyperNode:
+		if c.tag == "<>" {
+			return c.children, nil
+		}
+		return []hyperNode{c}, nil
+	case string:
+		return []hyperNode{{text: c}}, nil
+	case int64, float64:
+		return []hyperNode{{text: v.String()}}, nil
+	case bool:
+		return nil, nil
+	}
+	if obj, ok := v.(*goja.Object); ok && obj.ClassName() == "Array" {
+		var nodes []hyperNode
+		length := obj.Get("length").ToInteger()
+		for i := int64(0); i < length; i++ {
+			n, err := toNodes(vm, obj.Get(strconv.FormatInt(i, 10)), parent)
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, n...)
+		}
+		return nodes, nil
+	}
+	return nil, fmt.Errorf("unsupported child type: %T (in %s)", v.Export(), parent)
+}
+
+type hyperAttr struct {
+	name  string
+	value string
+	bare  bool
 }
 
 type hyperNode struct {
 	tag      string
-	attrs    map[string]any
+	attrs    []hyperAttr
 	children []hyperNode
 	text     string
+	raw      bool // text is written as-is instead of escaped
+}
+
+func rawNode(s string) hyperNode {
+	return hyperNode{text: s, raw: true}
 }
 
 func (h hyperNode) isSelfClosing() bool {
@@ -160,63 +262,64 @@ func (h hyperNode) isSelfClosing() bool {
 	}, h.tag)
 }
 
-func (h hyperNode) String() string {
-	if h.text != "" {
-		return h.text
-	}
+// rawTextElements hold text the browser doesn't decode entities in, so their
+// text children are written unescaped.
+var rawTextElements = []string{"script", "style"}
 
+func (h hyperNode) String() string {
 	var builder strings.Builder
+	h.write(&builder, false)
+	return builder.String()
+}
+
+func (h hyperNode) write(builder *strings.Builder, rawText bool) {
+	if h.tag == "" {
+		// replacePreNewlines also rewrites newlines inside JS strings in a
+		// <pre>, where the marker ends up in text instead of an element
+		text := strings.ReplaceAll(h.text, newlineMarker, "\n")
+		if h.raw || rawText {
+			builder.WriteString(text)
+		} else {
+			builder.WriteString(escapeText(text))
+		}
+		return
+	}
 
 	if h.tag != "<>" {
 		builder.WriteString("<" + h.tag)
-
-		if len(h.attrs) > 0 {
-			builder.WriteString(" ")
-			var i int
-			for k, v := range h.attrs {
-				i++
-				switch vv := v.(type) {
-				case string:
-					if vv == "" {
-						continue
-					}
-					builder.WriteString(k + "=\"" + vv + "\"")
-				case map[string]any:
-					// assuming this is a style object
-					var style strings.Builder
-					for k, v := range vv {
-						style.WriteString(k + ":" + v.(string) + ";")
-					}
-					builder.WriteString(k + "=\"" + style.String() + "\"")
-				case bool:
-					if vv {
-						builder.WriteString(k)
-					}
-				default:
-					log.Panicf("unsupported attr type: %T (in %s)", vv, h.tag)
-				}
-
-				if i < len(h.attrs) {
-					builder.WriteString(" ")
-				}
+		for _, a := range h.attrs {
+			builder.WriteString(" " + a.name)
+			if !a.bare {
+				builder.WriteString("=\"" + escapeAttr(a.value) + "\"")
 			}
 		}
-
 		if h.isSelfClosing() {
 			builder.WriteString("/")
 		}
 		builder.WriteString(">")
 	}
 
+	childRaw := rawText || slices.Contains(rawTextElements, strings.ToLower(h.tag))
 	for _, child := range h.children {
-		builder.WriteString(child.String())
+		child.write(builder, childRaw)
 	}
 
 	if !h.isSelfClosing() && h.tag != "<>" {
 		builder.WriteString("</" + h.tag + ">")
 	}
-	return builder.String()
 }
+
+var textEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+
+func escapeText(s string) string {
+	return textEscaper.Replace(s)
+}
+
+func escapeAttr(s string) string {
+	return html.EscapeString(s)
+}
+
+const newlineMarker = "<newline />"
 
 func replacePreNewlines(data []byte) []byte {
 	// Replace newlines with <newline /> between <pre> tags
@@ -225,7 +328,7 @@ func replacePreNewlines(data []byte) []byte {
 		if preEnd := bytes.Index(parts[i], []byte("</pre>")); preEnd != -1 {
 			preContent := parts[i][:preEnd]
 			afterPre := parts[i][preEnd:]
-			preContent = bytes.ReplaceAll(preContent, []byte("\n"), []byte("<newline />"))
+			preContent = bytes.ReplaceAll(preContent, []byte("\n"), []byte(newlineMarker))
 			parts[i] = append(preContent, afterPre...)
 		}
 	}

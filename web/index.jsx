@@ -33,11 +33,11 @@ data({
     <h3>Hello World</h3>
     <p>Create a directory for your site. From that directory, create an <code>index.jsx</code> file with simple HTML:</p>
     <pre><code>
-{`&lt;html&gt;
-    &lt;body&gt;
-        &lt;h1&gt;Hello World&lt;/h1&gt;
-    &lt;/body&gt;
-&lt;/html&gt;`}
+{`<html>
+    <body>
+        <h1>Hello World</h1>
+    </body>
+</html>`}
     </code></pre>
     <p>Then run:</p>
     <pre><code>taragen serve
