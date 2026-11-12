@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Backlinks
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Give every page the list of other pages that link to it, so layouts can show "3 logs link here" or a "linked from" list.
