@@ -11,6 +11,8 @@ branch: []
 
 # Proposal: Share card images
 
+Nov 12, 2026 · Jeff Lindsay, h.d.a.
+
 ## Abstract
 
 Let a site make a PNG share card for every page, for `og:image` and similar tags.
