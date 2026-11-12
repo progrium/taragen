@@ -165,5 +165,5 @@ None. `pages()` reads only the site's own page data, which any page can already 
 
 ## Open issues
 
-- Generated pages, proposed separately, would give folders like `/logs/2026` a source, so they'd appear in `logs/**`. A stream would then filter them out by path or with a `where` key such as `kind`. Should generated pages instead be left out of `**` like grouping nodes, or is that the generated pages proposal's call?
+- [generated-pages](generated-pages.md) would give folders like `/logs/2026` a source, so they'd appear in `logs/**`. A stream would then filter them out by path or with a `where` key such as `kind`. Should generated pages instead be left out of `**` like grouping nodes, or is that generated-pages's call?
 - Each result still carries its recursive `subpages`, so `pages("**")` copies deep trees for every page near the root. That's fine at the redesign's size; a `subpages: false` key could be added if it isn't.
