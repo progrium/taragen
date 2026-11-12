@@ -39,7 +39,7 @@ Both commands operate on the current working directory as the site root.
 | `jsx_test.go` | Table tests for JSX rendering. |
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
-| `cmd/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, status index, issues, and signing. |
+| `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, status index, issues, and signing. |
 | `internal/proposaltest/` | Ties Go test cases to proposals by tags in their names. |
 | `docs/spec.md`, `docs/design/` | This spec, and the design proposals that change it. |
 | `AGENTS.md` | Rules for AI agents working in the repository. |
@@ -413,7 +413,7 @@ the repository and uses only Go, git, and the `gh` CLI:
   differently is rejected), loads `docs/design/`, `SIGNERS`, and this spec, and
   implements `Check`, the computed states (ready, in progress, stalled, read
   from branch refs), the Mermaid graph, and the generated `STATUS.md`.
-- `cmd/design` is the CLI: `list`, `ready`, `graph`, `status`, `new`,
+- `tools/design` is the CLI: `list`, `ready`, `graph`, `status`, `new`,
   `propose`, `log`, `sign`, `close-issues`, `check`, and `test`. `sign` is
   interactive unless given `--login` and `--date`; `propose` and
   `close-issues` shell out to `gh`.

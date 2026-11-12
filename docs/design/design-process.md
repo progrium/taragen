@@ -13,7 +13,7 @@ branch: [main]
 
 ## Abstract
 
-Adopt a proposal-driven design process: one Markdown proposal per design change in `docs/design/`, a spec describing the system as built, a small in-repo tool (`cmd/design`) that validates and summarizes proposals, and CI that enforces the rules and keeps a generated status index.
+Adopt a proposal-driven design process: one Markdown proposal per design change in `docs/design/`, a spec describing the system as built, a small in-repo tool (`tools/design`) that validates and summarizes proposals, and CI that enforces the rules and keeps a generated status index.
 
 ## Background
 
@@ -27,7 +27,7 @@ Add the process described in the [design README](README.md):
 - `docs/spec.md` describes taragen as built, and is signed by whoever last reviewed it as a whole.
 - `docs/design/` holds the process README, `TEMPLATE.md`, `SIGNERS`, one `<slug>.md` per proposal, and a generated `STATUS.md`.
 - Proposal frontmatter is a strict YAML subset with the keys, statuses, and computed states the README defines.
-- `cmd/design` provides `list`, `ready`, `graph`, `status`, `new`, `propose`, `log`, `sign`, `close-issues`, `check`, and `test`, using only Go, git, and `gh`.
+- `tools/design` provides `list`, `ready`, `graph`, `status`, `new`, `propose`, `log`, `sign`, `close-issues`, `check`, and `test`, using only Go, git, and `gh`.
 - `internal/proposaltest` tags Go test cases with proposals (`name [a, b]`) and skips cases for unimplemented proposals unless `DESIGN_PENDING=1`.
 - Four workflows: `design-check.yml`, `test.yml`, `design-status.yml`, and `design-sign.yml`.
 - `AGENTS.md` restates the rules for AI agents.
@@ -52,7 +52,7 @@ The status workflow can write to `main` (only `STATUS.md`) and close issues.
 
 ## Done criteria
 
-- [x] `go run ./cmd/design check` passes on the repository.
+- [x] `go run ./tools/design check` passes on the repository.
 - [x] Each `check` rule has a fixture under `internal/design/testdata/check/`, run by `go test ./internal/design`.
 - [x] `list`, `ready`, `graph`, `status`, `new`, and `log` work on the repository.
 - [x] `propose --dry-run` and `close-issues --dry-run` show what they'd do without changing anything.
@@ -64,7 +64,7 @@ The status workflow can write to `main` (only `STATUS.md`) and close issues.
 
 1. Write the spec and the baseline proposal.
 2. Add the README, template, and signers list.
-3. Build `cmd/design` and `internal/design`, with a fixture per check rule.
+3. Build `tools/design` and `internal/design`, with a fixture per check rule.
 4. Add `internal/proposaltest` and tag the existing tests.
 5. Add the CI workflows and `AGENTS.md`.
 6. Create the `Proposal` label on GitHub, and add signers.

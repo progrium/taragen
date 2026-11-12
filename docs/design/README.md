@@ -1,6 +1,6 @@
 # Design process
 
-Changes to taragen's design go through proposals: one Markdown file per change in this directory, with frontmatter that `cmd/design` validates and summarizes.
+Changes to taragen's design go through proposals: one Markdown file per change in this directory, with frontmatter that `tools/design` validates and summarizes.
 The [spec](../spec.md) describes taragen as built. Proposals say what changes and why; the spec says what exists.
 The order of work comes from the dependency graph between proposals, not from milestones.
 
@@ -39,7 +39,7 @@ Write one before changing any of taragen's public surfaces:
 - **Serve mode:** HTTP behavior and the live reload protocol.
 - **New major components:** a new page format, an asset pipeline, plugins, or a new dependency that changes how sites are built.
 - **Distribution:** supported platforms and install channels.
-- **This process:** this README, the template, `cmd/design`, the design CI jobs, and `AGENTS.md`.
+- **This process:** this README, the template, `tools/design`, the design CI jobs, and `AGENTS.md`.
 
 Bug fixes, workarounds, performance work that doesn't change output, internal refactors, and changes to the example site in `web/` don't need one; put their reasoning in code comments and commit messages.
 A bug fix that changes documented behavior (for example, copying `_assets/` in builds) does need one. When in doubt, draft one.
@@ -135,13 +135,13 @@ A doc is signed with a line under its title: `Nov 11, 2026 · Full Name, h.d.a.`
 **h.d.a.** means *human-directed, AI-assisted*: work substantially directed by the named person, who reviewed it closely enough to defend it and takes responsibility for it, however much AI wrote. A line without `, h.d.a.` is also accepted, for work written by hand.
 The spec is signed the same way by whoever last reviewed it as a whole.
 
-Only a deliberate act by the named person adds a signature: a `/sign <slug>` or `/sign spec` comment on a PR, `go run ./cmd/design sign <slug>` at a terminal, or typing the line by hand.
+Only a deliberate act by the named person adds a signature: a `/sign <slug>` or `/sign spec` comment on a PR, `go run ./tools/design sign <slug>` at a terminal, or typing the line by hand.
 Re-sign after significant changes. Only people in [SIGNERS](SIGNERS) can sign, and each person adds their own line there. Agents never sign, run `sign`, post `/sign`, or edit `SIGNERS`. An unsigned proposal is unlikely to be accepted.
 
 ## Flow
 
-1. **Draft.** `go run ./cmd/design new <slug> --title "..."` copies the template with frontmatter filled in. A spike for a draft is fine; record its branch in `branch`.
-2. **Optionally propose.** `go run ./cmd/design propose <slug>` files the issue, labeled `Proposal`, and sets `status: proposed` in one commit. Discussion happens on the issue; the doc is revised in commits.
+1. **Draft.** `go run ./tools/design new <slug> --title "..."` copies the template with frontmatter filled in. A spike for a draft is fine; record its branch in `branch`.
+2. **Optionally propose.** `go run ./tools/design propose <slug>` files the issue, labeled `Proposal`, and sets `status: proposed` in one commit. Discussion happens on the issue; the doc is revised in commits.
 3. **Sign.** The person who directed the work reviews the whole doc and signs it.
 4. **Optionally accept.** If it's decided but nobody is starting it yet, set `status: accepted`.
 5. **Build on a feature branch** named after the slug, listed in `branch`. Each PR updates Done criteria, `depends` if a dependency turns up, and dated Updates notes.
@@ -176,14 +176,14 @@ proposaltest.Run(t, "renders fragments [baseline]", func(t *testing.T) { ... })
 
 - A tagged case whose proposal isn't implemented is skipped, unless `DESIGN_PENDING=1` is set. It starts running in the commit that marks the proposal implemented.
 - Untagged cases always run.
-- `go run ./cmd/design test <slug>` runs one proposal's tagged cases whatever its status (and, since Go can't filter them out, every top-level test that has no subtests).
+- `go run ./tools/design test <slug>` runs one proposal's tagged cases whatever its status (and, since Go can't filter them out, every top-level test that has no subtests).
 - `check` validates the tags in `_test.go` files, on lines that call `.Run(` or set a `name:` field: the format, and that each slug exists.
 
 Demos are written as tagged test cases, so there is no separate demo registry.
 
 ## Tooling
 
-`cmd/design` implements the workflow with only the Go toolchain, git, and the `gh` CLI for the commands that touch issues. Run `go run ./cmd/design` for usage.
+`tools/design` implements the workflow with only the Go toolchain, git, and the `gh` CLI for the commands that touch issues. Run `go run ./tools/design` for usage.
 
 | Command | Does |
 | --- | --- |

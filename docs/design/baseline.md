@@ -42,7 +42,7 @@ None: no code changes, so nothing new is reachable.
 
 - [x] The spec describes the CLI, site conventions, formats, rendering flow, build and serve modes, and known limitations, as of commit `0f08e28`.
 - [x] The existing JSX cases in `jsx_test.go` are tagged `[baseline]` and pass with `go test ./...`.
-- [x] `go run ./cmd/design test baseline` runs the tagged cases.
+- [x] `go run ./tools/design test baseline` runs the tagged cases.
 
 ## Implementation
 

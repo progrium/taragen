@@ -1,7 +1,7 @@
 // Command design runs taragen's proposal-driven design workflow. See
 // docs/design/README.md.
 //
-//	go run ./cmd/design <command> [flags]
+//	go run ./tools/design <command> [flags]
 package main
 
 import (
@@ -35,7 +35,7 @@ var commands = []command{
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: go run ./cmd/design [-C dir] <command> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: go run ./tools/design [-C dir] <command> [flags]")
 	fmt.Fprintln(os.Stderr)
 	for _, c := range commands {
 		fmt.Fprintf(os.Stderr, "  %-14s %s\n  %-14s   %s\n", c.name, c.args, "", c.short)

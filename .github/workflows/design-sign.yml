@@ -58,7 +58,7 @@ jobs:
           TARGET: ${{ steps.req.outputs.target }}
           BRANCH: ${{ steps.req.outputs.branch }}
         run: |
-          go build -o "$RUNNER_TEMP/design" ./cmd/design
+          go build -o "$RUNNER_TEMP/design" ./tools/design
           cp docs/design/SIGNERS "$RUNNER_TEMP/SIGNERS.main"
           if ! grep -v '^#' "$RUNNER_TEMP/SIGNERS.main" | awk '{print tolower($1)}' | grep -qx "$(printf '%s' "$COMMENTER" | tr 'A-Z' 'a-z')"; then
             echo "error=@$COMMENTER is not in docs/design/SIGNERS on main" >> "$GITHUB_OUTPUT"

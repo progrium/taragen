@@ -4,7 +4,7 @@
 // proves, in brackets: "renders fragments [baseline]". Tags are written
 // "[a, b]" exactly, since tooling matches them as text. A tagged case whose
 // proposals aren't all implemented is skipped, unless DESIGN_PENDING=1 is
-// set (as `go run ./cmd/design test <slug>` does). Untagged cases always run.
+// set (as `go run ./tools/design test <slug>` does). Untagged cases always run.
 package proposaltest
 
 import (
@@ -57,7 +57,7 @@ func Gate(t *testing.T, slugs ...string) {
 			t.Fatalf("proposaltest: test is tagged with unknown proposal %q", s)
 		}
 		if !p.Implemented() && os.Getenv("DESIGN_PENDING") != "1" {
-			t.Skipf("proposal %s is %s; set DESIGN_PENDING=1 or run `go run ./cmd/design test %s`", s, p.Status, s)
+			t.Skipf("proposal %s is %s; set DESIGN_PENDING=1 or run `go run ./tools/design test %s`", s, p.Status, s)
 		}
 	}
 }

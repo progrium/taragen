@@ -32,7 +32,7 @@ test:
 
 ## Validate design proposals
 design-check:
-	go run ./cmd/design check
+	go run ./tools/design check
 .PHONY: design-check
 
 ## Build the web assets
