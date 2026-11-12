@@ -226,7 +226,11 @@ func (s *Site) Partial(name string, globals map[string]any, args ...any) ([]byte
 	return RenderTemplate(name, partialSrc, nil)
 }
 
-func (s *Site) walk(fn func(filename string, pagepath string) error) error {
+// walk calls fn for every page source, directory, and static file in the
+// site, and template for every page source with a bracketed parameter in its
+// path. Bracketed directories are walked but aren't pages, and anything in
+// one that can't be a template is an error.
+func (s *Site) walk(fn func(filename string, pagepath string) error, template func(t *pageTemplate) error) error {
 	return filepath.Walk(s.dir, func(curPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -237,11 +241,33 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 			}
 			return nil
 		}
+		rel, err := filepath.Rel(s.dir, curPath)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		inParamDir := false
+		if rel != "." {
+			for _, dir := range strings.Split(path.Dir(rel), "/") {
+				if paramSegment.MatchString(dir) {
+					inParamDir = true
+				}
+			}
+		}
 		if strings.HasPrefix(info.Name(), "_") {
+			if inParamDir {
+				return fmt.Errorf("%s: _-prefixed files aren't allowed inside a bracketed directory", rel)
+			}
 			if info.IsDir() {
 				return fs.SkipDir
 			}
 			return nil
+		}
+		isParam := false
+		if rel != "." {
+			if isParam, err = checkSegment(rel, info.Name(), info.IsDir()); err != nil {
+				return err
+			}
 		}
 
 		isPage := false
@@ -250,6 +276,25 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 				isPage = true
 			}
 		}
+
+		if isParam || inParamDir {
+			switch {
+			case info.IsDir():
+				// a bracketed directory is a pattern, not a page
+				return nil
+			case !isPage:
+				return fmt.Errorf("%s: static files aren't allowed inside a bracketed directory", rel)
+			case filepath.Ext(info.Name()) != ExtJSX:
+				return fmt.Errorf("%s: templates must be .jsx", rel)
+			}
+			pattern := strings.TrimPrefix(s.normalizePath(curPath), "/")
+			names, err := templateParams(pattern)
+			if err != nil {
+				return fmt.Errorf("%s: %w", rel, err)
+			}
+			return template(&pageTemplate{file: rel, pattern: pattern, names: names})
+		}
+
 		if !isPage && !info.IsDir() {
 			return fn(curPath, "")
 		}
@@ -258,8 +303,9 @@ func (s *Site) walk(fn func(filename string, pagepath string) error) error {
 	})
 }
 
-// ParseAll resets the page map, parses every page found by walk, builds the
-// route table, and builds the link graph.
+// ParseAll resets the page map, parses every page found by walk, generates
+// the pages for every template from the real pages, builds the route table,
+// and builds the link graph.
 func (s *Site) ParseAll() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -274,6 +320,7 @@ func (s *Site) ParseAll() error {
 	}
 
 	var pagepaths, statics []string
+	var templates []*pageTemplate
 	parsed := make(map[string]bool)
 
 	// _assets is pruned from the page tree like every underscore directory,
@@ -297,12 +344,27 @@ func (s *Site) ParseAll() error {
 		parsed[pagepath] = true
 		pagepaths = append(pagepaths, pagepath)
 		return s.Page(pagepath).Parse()
+	}, func(t *pageTemplate) error {
+		templates = append(templates, t)
+		return nil
 	}); err != nil {
 		return err
 	}
 
+	generated, err := s.generatePages(templates)
+	if err != nil {
+		return err
+	}
+	for _, gp := range generated {
+		// a generated page can fill a bare directory walk already found
+		if !parsed["/"+gp] {
+			pagepaths = append(pagepaths, gp)
+		}
+	}
+
 	// A body that called pages() saw only the pages parsed before it, so it
-	// is parsed again now that the whole page set exists, and its links
+	// is parsed again now that the whole page set exists, generated pages
+	// included, and its links
 	// don't depend on walk order.
 	for _, pagepath := range pagepaths {
 		if p := s.Page(pagepath); p.usesPages {

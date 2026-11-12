@@ -42,6 +42,14 @@ type Page struct {
 	templates []*Output
 	optOut    any
 
+	// set for generated pages: the template source relative to the site
+	// root, and the parameter set seeded as page.params
+	template string
+	params   map[string]any
+	// virtualDir is a bare directory added for a generated page's parent,
+	// with no directory on disk
+	virtualDir bool
+
 	// usesPages is set when pages() is called while the page parses, so
 	// ParseAll can parse it again once every page exists
 	usesPages bool
@@ -49,6 +57,12 @@ type Page struct {
 	// the link pass at the end of ParseAll and kept across re-parses
 	links     []any
 	backlinks []any
+}
+
+// Template returns the template source a generated page renders from,
+// relative to the site root, or "" for any other page.
+func (p *Page) Template() string {
+	return p.template
 }
 
 // URL returns the page's URL path, such as "/" or "/docs/intro".
@@ -228,7 +242,28 @@ func (p *Page) Parse() error {
 	p.aliases = nil
 	p.usesPages = false
 
+	if p.virtualDir {
+		return nil
+	}
+	if p.template != "" {
+		// a generated page renders from its template, with its parameter
+		// set always seeded
+		p.data[Params] = p.params
+		src, err = os.ReadFile(filepath.Join(p.site.dir, filepath.FromSlash(p.template)))
+		if err != nil {
+			return err
+		}
+		format = ExtJSX
+		p.file = p.template
+		if path.Base(p.template) == "index"+ExtJSX {
+			p.data[IsDir] = true
+		}
+	}
+
 	for _, suffix := range suffixes {
+		if src != nil {
+			break
+		}
 		src, err = os.ReadFile(path.Join(p.site.dir, p.path+suffix))
 		if err == nil {
 			format = filepath.Ext(suffix)

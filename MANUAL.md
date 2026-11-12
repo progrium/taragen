@@ -1042,7 +1042,7 @@ params(() => pages("logs/**").map(l => ({
 data({ title: `${page.params.year}-${page.params.month}` });
 <ul>
   {pages("logs/**")
-    .filter(l => l.date.startsWith(`${page.params.year}-${page.params.month}`))
+    .filter(l => !l.params && l.date.startsWith(`${page.params.year}-${page.params.month}`))
     .map(l => <li><a href={l.path}>{l.title ?? l.date}</a></li>)}
 </ul>
 ```
