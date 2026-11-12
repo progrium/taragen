@@ -1,5 +1,6 @@
 ---
 title: Date formatter utility
+tags: [jsx]
 ---
 
 Add the following to your `_globals.jsx` file:

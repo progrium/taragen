@@ -1,5 +1,6 @@
 ---
 title: Active state for navigation
+tags: [jsx, layouts]
 ---
 
 In your JSX page file (or layout file), reference a nav partial:

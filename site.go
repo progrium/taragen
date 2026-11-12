@@ -170,26 +170,6 @@ func cleanDir(dir string) error {
 	return nil
 }
 
-func (s *Site) Pages(name string) (pages []*Page) {
-	if !strings.Contains(name, "*") {
-		if s.IsPage(name) {
-			return s.Page(name).Subpages()
-		}
-		return nil
-	}
-	for pathname, page := range s.pages {
-		m, err := path.Match(name, pathname)
-		if err != nil {
-			continue // TODO: log error
-		}
-		if m {
-			pages = append(pages, page.Subpages()...)
-		}
-	}
-	sortPages(pages)
-	return pages
-}
-
 func (s *Site) Page(normalPath string) *Page {
 	normalPath = strings.TrimPrefix(normalPath, "/")
 	if _, ok := s.pages[normalPath]; !ok {
