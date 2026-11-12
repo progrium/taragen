@@ -1,0 +1,3 @@
+error: README.md:1: link to docs/design/missing.md, which doesn't exist
+error: README.md:1: link to docs/design/c.md, which doesn't exist
+error: docs/design/a.md:14: link to docs/design/b.md, which doesn't exist

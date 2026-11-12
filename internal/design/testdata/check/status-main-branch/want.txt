@@ -1,0 +1,1 @@
+error: docs/design/a.md:8: branch lists main, but the proposal isn't implemented

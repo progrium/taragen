@@ -1,0 +1,1 @@
+error: docs/design/b.md:2: duplicate issue 3 (also in docs/design/a.md)

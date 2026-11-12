@@ -1,0 +1,1 @@
+error: docs/design/a.md:16: implemented proposal has an open Done criteria item

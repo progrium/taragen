@@ -1,0 +1,2 @@
+error: docs/design/9lives.md:2: slug "9lives" must start with a letter
+error: docs/design/Bad_Slug.md:2: slug "Bad_Slug" must be lowercase letters and digits joined by dashes

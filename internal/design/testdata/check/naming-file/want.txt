@@ -1,0 +1,1 @@
+error: docs/design/b.md:2: file must be named a.md for slug "a"

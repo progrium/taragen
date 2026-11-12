@@ -1,9 +1,9 @@
-# Taragen Design
+# Taragen spec
 
-This document describes how taragen is implemented today: its architecture, the
-main components, how a request or build flows through them, and the decisions
-(and known rough edges) baked into the current code. It describes what the code
-*does*, not a roadmap.
+This spec describes taragen as built: its architecture, the main components, how
+a build or request flows through them, and the decisions (and known rough edges)
+baked into the current code. It describes what exists, never unbuilt features.
+Changes to it go through proposals; see [the design process](design/README.md).
 
 ## Overview
 
@@ -39,6 +39,10 @@ Both commands operate on the current working directory as the site root.
 | `jsx_test.go` | Table tests for JSX rendering. |
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
+| `cmd/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, status index, issues, and signing. |
+| `internal/proposaltest/` | Ties Go test cases to proposals by tags in their names. |
+| `docs/spec.md`, `docs/design/` | This spec, and the design proposals that change it. |
+| `AGENTS.md` | Rules for AI agents working in the repository. |
 
 ## Core concepts
 
@@ -391,10 +395,37 @@ where noted.
 - `make dist` cross-compiles for darwin, windows, and linux on amd64 and arm64
   into `.local/dist/`.
 - `make web-serve` / `make web-build` run the binary against `web/`.
+- `make test` runs `go test ./...`; `make design-check` runs the design check.
 - CI (`.github/workflows/build.yml`) delegates to the shared
   `progrium/github-workflows` Go CLI build workflow on every push, with
   Go 1.23.1 and an extra linux-386 target.
-- Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`.
+- Tests: `go test ./...` runs the JSX rendering table tests in `jsx_test.go`
+  (tagged `[baseline]`) and the design tooling tests.
+
+## Design process tooling
+
+Design changes go through proposals in `docs/design/`, as described in the
+[design process README](design/README.md). The tooling that supports it lives in
+the repository and uses only Go, git, and the `gh` CLI:
+
+- `internal/design` parses proposal frontmatter (a strict YAML subset, with its
+  own parser rather than a YAML library, so anything another parser could read
+  differently is rejected), loads `docs/design/`, `SIGNERS`, and this spec, and
+  implements `Check`, the computed states (ready, in progress, stalled, read
+  from branch refs), the Mermaid graph, and the generated `STATUS.md`.
+- `cmd/design` is the CLI: `list`, `ready`, `graph`, `status`, `new`,
+  `propose`, `log`, `sign`, `close-issues`, `check`, and `test`. `sign` is
+  interactive unless given `--login` and `--date`; `propose` and
+  `close-issues` shell out to `gh`.
+- `internal/proposaltest` skips subtests tagged with an unimplemented proposal
+  unless `DESIGN_PENDING=1`.
+- `check` rules are tested by fixtures under `internal/design/testdata/check/`,
+  each a tiny repository root with the exact diagnostics it should produce.
+- CI: `design-check.yml` runs `check` on every PR; `test.yml` runs `go test`
+  on PRs except from `claude/` branches; `design-status.yml` regenerates
+  `STATUS.md` and closes decided proposals' issues on main; `design-sign.yml`
+  signs a doc for a listed signer on a `/sign` PR comment, using the tool and
+  `SIGNERS` from main.
 
 ## Dependencies
 

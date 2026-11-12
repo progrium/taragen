@@ -1,0 +1,1 @@
+error: docs/design/a.md:7: dependency cycle: a -> b -> c -> a

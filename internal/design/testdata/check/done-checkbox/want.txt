@@ -1,0 +1,4 @@
+error: docs/design/a.md:17: Done criteria item is not a checkbox (- [ ], - [x], or - [~])
+error: docs/design/a.md:18: Done criteria item is not a checkbox (- [ ], - [x], or - [~])
+error: docs/design/a.md:19: Done criteria item is not a checkbox (- [ ], - [x], or - [~])
+error: docs/design/a.md:20: Done criteria item is not a checkbox (- [ ], - [x], or - [~])

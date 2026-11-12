@@ -1,0 +1,2 @@
+error: docs/design/a-copy.md:2: file must be named a.md for slug "a"
+error: docs/design/a-copy.md:2: duplicate slug "a" (also in docs/design/a.md)
