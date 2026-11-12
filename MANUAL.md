@@ -956,6 +956,16 @@ like `sans-serif` don't count unless you have a font with that name. An unknown
 family fails the card with an error that lists the families taragen found, so a
 typo shows up immediately instead of silently falling back.
 
+Variable fonts work. `font-weight` sets the `wght` axis (up to 900; for heavier
+weights use `font-variation-settings="'wght' 1000"`), and
+`font-variation-settings` sets any other axis, such as Recursive's `CASL` and
+`MONO`. A font with a `slnt` axis but no `ital` axis, like Recursive, ignores
+`font-style="italic"`; use `font-style="oblique"` or `'slnt' -15` instead.
+
+Pixel fonts stay crisp at sizes on their pixel grid with whole-pixel `x` and
+`y`. Silkscreen, for example, is 8 pixels per em, so use 16, 24, 32, and so on.
+`text-rendering="optimizeSpeed"` turns antialiasing off at any size.
+
 ### Measuring text with `measureText()`
 
 `measureText(text, font)` returns the width of a string in pixels, using the
@@ -971,7 +981,7 @@ measureText("Building your own Ngrok", { family: "Recursive", size: 72, weight: 
 | `size` | `16` (pixels) |
 | `weight` | `400` |
 | `style` | `"normal"` |
-| `letterSpacing` | `0` (pixels) |
+| `letterSpacing` | `0` (pixels, added between letters, not after the last) |
 
 An unknown family throws. `measureText` works in any JSX file, not just card
 templates. Line breaking is up to you; the `wrap` helper above is a simple word

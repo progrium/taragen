@@ -24,6 +24,9 @@ type Site struct {
 	warnings  []string
 
 	mu sync.Mutex
+
+	fontsMu sync.Mutex
+	fonts   siteFonts
 }
 
 func NewSite(dir string, drafts bool) *Site {
@@ -316,6 +319,10 @@ func (s *Site) ParseAll() error {
 
 	redirectsFile, rules, err := s.readRedirects()
 	if err != nil {
+		return err
+	}
+
+	if err := s.refreshFonts(); err != nil {
 		return err
 	}
 

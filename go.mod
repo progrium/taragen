@@ -6,6 +6,7 @@ require (
 	github.com/dop251/goja v0.0.0-20250125213203-5ef83b82af17
 	github.com/evanw/esbuild v0.24.2
 	github.com/gorilla/websocket v1.5.3
+	github.com/tetratelabs/wazero v1.10.1
 	github.com/yosssi/gohtml v0.0.0-20201013000340-ee4748c638f4
 	github.com/yuin/goldmark v1.7.8
 	github.com/yuin/goldmark-highlighting v0.0.0-20220208100518-594be1970594

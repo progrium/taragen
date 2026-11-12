@@ -37,6 +37,8 @@ Both commands operate on the current working directory as the site root.
 | `aliases.go` | Reading and normalizing `aliases`, and writing redirect stubs. |
 | `redirects.go` | Parsing `_redirects`, adding its route rows, and matching wildcard rules in serve. |
 | `links.go` | The link pass: collecting `links` from page bodies, normalizing hrefs, and inverting them into `backlinks`. |
+| `cards.go` | Raster outputs and `measureText`: the site's font database and the glue to `internal/raster`. |
+| `internal/raster/` | SVG to PNG: the embedded resvg WebAssembly module (source in `module/`), run with wazero, plus font discovery, SVG checks, image resolution, and the PNG encoder. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser, leading statement scanning, and the built-in JS globals (`page`, `partial`, `pages`, `params`). |
 | `query.go` | `pages()` queries: pattern matching with `**`, the object form with `where`, and the listing order. |
@@ -281,6 +283,12 @@ Built-in globals, added after user globals so they always win:
   in every JSX VM, including layouts and partials.
 - `pages(query)`: returns page data objects (each with a recursive `subpages`
   array), sorted as one listing (see Ordering). See Page queries below.
+- `measureText(text, font)`: the advance width of `text` in pixels, from the
+  same fonts and shaping as raster outputs (see Raster outputs). `font` takes
+  `family` (required), `size` (pixels, default `16`), `weight` (default `400`),
+  `style` (default `normal`), and `letterSpacing` (pixels, default `0`, added
+  between letters but not after the last). An unknown family throws. It is
+  also set while `_globals.jsx` runs, so helpers defined there can call it.
 - `params(sets)`: declares a template's parameter sets (see Generated pages).
   It is only read as a template's leading statement; any call that runs in a
   page body, layout, or partial throws.
@@ -461,6 +469,48 @@ data and never the page's. It reads:
 A `text/html` output is formatted with `gohtml` like a page. A template that
 throws fails the build, or is a 500 in `serve`, with an error naming the output
 and its page.
+
+### Raster outputs
+
+An output whose content type is `image/png` (by default, any template named
+`<name>.png.jsx`) is a raster output: its template returns SVG, as an element
+or a string of markup, and `cards.go` rasterizes it with `internal/raster`
+instead of writing it. The preamble is ignored.
+
+- **SVG checks.** Before rendering, `encoding/xml` reads the markup: the root
+  must be `<svg>` with `width` and `height` in whole pixels (a `px` suffix is
+  allowed), each at most 4096. `xmlns` is added to the root when missing.
+  `data({ scale: n })` renders at a whole-number multiple from 1 to 4.
+- **Fonts.** Every `.ttf`, `.otf`, `.ttc`, `.woff`, and `.woff2` file in the
+  site, apart from `_public/` and dot-prefixed paths, is loaded into one font
+  database, in path order, the first time a raster output or `measureText`
+  needs it. `ParseAll` drops the database when any font file's path, size, or
+  modification time changed, so the next use rebuilds it. WOFF and WOFF2 are
+  decoded inside the module once, at load. System fonts are never loaded.
+  Faces are matched by `font-family`, `font-weight`, and `font-style`, and
+  where two files provide the same face the first path wins. A `font-family`
+  list naming no loaded family, including a generic like `sans-serif` and an
+  element with no family at all, fails the render with the list and the loaded
+  families. Variable fonts work: `font-weight` sets `wght`, and
+  `font-variation-settings` sets any axis, such as Recursive's `CASL` and
+  `MONO`.
+- **Images.** `<image>` `href` and `xlink:href` may be `data:` URIs or
+  root-relative paths to files inside the site directory after symlinks are
+  resolved. Anything else (URLs, relative paths, `.` or `..` segments, paths
+  that leave the site) fails the render. PNG, JPEG, GIF, WebP, and SVG images
+  are supported.
+- **Engine.** resvg 0.50 is compiled to `wasm32-unknown-unknown` with no
+  imports and embedded with `go:embed`. wazero compiles it once per process on
+  first use (natively on amd64 and arm64, with its interpreter elsewhere), so
+  sites without raster outputs never compile it. Each render runs in a fresh
+  instance; `measureText` reuses one long-lived instance per font database.
+  Instance memory is capped at 1 GiB, and a render that traps reports it.
+- **Determinism.** The module returns premultiplied RGBA pixels, and Go
+  encodes them as a non-interlaced 8-bit RGBA PNG with no ancillary chunks, so
+  the same SVG and fonts always give the same bytes.
+
+A raster output that fails any of these checks fails the build, or is a 500 in
+`serve`, like any output template that throws.
 
 ### Aliases and redirects
 
@@ -721,6 +771,13 @@ where noted.
   into `.local/dist/`.
 - `make web-serve` / `make web-build` run the binary against `web/`.
 - `make test` runs `go test ./...`; `make design-check` runs the design check.
+- `make resvg` rebuilds `internal/raster/resvg.wasm` from the Rust crate in
+  `internal/raster/module/`, with the toolchain pinned by its
+  `rust-toolchain.toml`, a locked `Cargo.lock`, and path prefixes remapped so
+  the build is reproducible. Building taragen itself needs only Go.
+- `.github/workflows/resvg.yml` rebuilds the module and fails if it differs
+  from the committed file, and runs the raster tests with `GOARCH=386`, where
+  wazero uses its interpreter.
 - CI (`.github/workflows/build.yml`) delegates to the shared
   `progrium/github-workflows` Go CLI build workflow on every push, with
   Go 1.23.1 and an extra linux-386 target.
@@ -728,7 +785,9 @@ where noted.
   the page tests in `page_test.go`, the output and route table tests in
   `outputs_test.go`, the link graph tests in `links_test.go`, the generated
   page tests in `generated_test.go`, the build, serve, and watcher tests in
-  `site_test.go` and `serve_test.go`, and the design tooling tests.
+  `site_test.go` and `serve_test.go`, the share card and `measureText` tests
+  in `cards_test.go`, the rasterizer tests in `internal/raster` (with
+  Silkscreen, under the OFL, as the test font), and the design tooling tests.
 
 ## Design process tooling
 
@@ -759,3 +818,8 @@ and uses only Go and git:
 | `github.com/gorilla/websocket` | Live reload socket. |
 | `golang.org/x/net/html` | Tokenizing page bodies to collect links. |
 | `tractor.dev/toolkit-go` | CLI framework (`engine`, `cli`) and the `watchfs` file watcher. |
+| `github.com/tetratelabs/wazero` | Pure-Go WebAssembly runtime for the embedded resvg module. |
+
+The embedded module is built from the Rust crates `resvg` (with `usvg`,
+`tiny-skia`, and `fontdb`; MIT or Apache-2.0) and `wuff` (MIT, for WOFF and
+WOFF2), pinned in `internal/raster/module/Cargo.lock`.

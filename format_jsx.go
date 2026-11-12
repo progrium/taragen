@@ -12,7 +12,8 @@ type JSXParser struct{}
 
 func builtinGlobals(p *Page) map[string]any {
 	return map[string]any{
-		"page": p.data,
+		"page":        p.data,
+		"measureText": measureTextFunc(p.site),
 		// a template's leading params(...) statements are run by the
 		// parameters pass and removed by wrapJSX, so any call that reaches
 		// the VM is misplaced

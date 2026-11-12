@@ -61,17 +61,17 @@ func TestOutputTxt(t *testing.T) {
 
 func TestOutputSuffix(t *testing.T) {
 	dir := writeSite(t, map[string]string{
-		"_outputs/card.png.jsx": "`card for ${page.path}`",
+		"_outputs/card.svg.jsx": "`card for ${page.path}`",
 		"about.jsx":             `<a href={page.outputs.card}>card</a>`,
 	})
 	mustBuild(t, dir)
-	if got := readOut(t, dir, "about.card.png"); got != "card for /about" {
-		t.Errorf("about.card.png: got %q", got)
+	if got := readOut(t, dir, "about.card.svg"); got != "card for /about" {
+		t.Errorf("about.card.svg: got %q", got)
 	}
-	assertContains(t, readOut(t, dir, "about/index.html"), `<a href="/about.card.png">card</a>`)
+	assertContains(t, readOut(t, dir, "about/index.html"), `<a href="/about.card.svg">card</a>`)
 
 	site := parsed(t, dir, false)
-	want := map[string]any{"card": "/about.card.png"}
+	want := map[string]any{"card": "/about.card.svg"}
 	if got := site.Page("about").data[Outputs]; !reflect.DeepEqual(got, want) {
 		t.Errorf("page.outputs: expected %v, got %v", want, got)
 	}
@@ -80,7 +80,7 @@ func TestOutputSuffix(t *testing.T) {
 func TestOutputNearestWins(t *testing.T) {
 	dir := writeSite(t, map[string]string{
 		"_outputs/txt.jsx":         "`root`",
-		"_outputs/card.png.jsx":    "`root card`",
+		"_outputs/card.svg.jsx":    "`root card`",
 		"logs/_outputs/txt.jsx":    "`logs`",
 		"logs/_outputs/card.jsx":   "`logs card`",
 		"about.jsx":                `<p/>`,
@@ -95,7 +95,7 @@ func TestOutputNearestWins(t *testing.T) {
 		"notes/second.txt":     "root",
 		"logs.txt":             "logs",
 		"logs/2024/first.txt":  "logs",
-		"about.card.png":       "root card",
+		"about.card.svg":       "root card",
 		"logs/2024/first.card": "logs card",
 	} {
 		if got := readOut(t, dir, name); got != want {
@@ -104,8 +104,8 @@ func TestOutputNearestWins(t *testing.T) {
 	}
 	// the nearer card template has a different suffix, which replaces the
 	// root one
-	if exists(dir, "logs/2024/first.card.png") {
-		t.Error("logs/2024/first.card.png should not be written")
+	if exists(dir, "logs/2024/first.card.svg") {
+		t.Error("logs/2024/first.card.svg should not be written")
 	}
 	site := parsed(t, dir, false)
 	want := map[string]any{"txt": "/logs/2024/first.txt", "card": "/logs/2024/first.card"}
@@ -140,7 +140,7 @@ func TestOutputBadTemplateName(t *testing.T) {
 func TestOutputOptOut(t *testing.T) {
 	dir := writeSite(t, map[string]string{
 		"_outputs/txt.jsx":      "`txt`",
-		"_outputs/card.png.jsx": "`card`",
+		"_outputs/card.svg.jsx": "`card`",
 		"all.md":                "all\n",
 		"notxt.md":              "---\noutputs: { txt: false }\n---\nx\n",
 		"none.md":               "---\noutputs: false\n---\nx\n",
@@ -155,21 +155,21 @@ func TestOutputOptOut(t *testing.T) {
 	mustBuild(t, dir)
 	site := parsed(t, dir, false)
 	for page, want := range map[string]map[string]any{
-		"all":     {"txt": "/all.txt", "card": "/all.card.png"},
-		"notxt":   {"card": "/notxt.card.png"},
+		"all":     {"txt": "/all.txt", "card": "/all.card.svg"},
+		"notxt":   {"card": "/notxt.card.svg"},
 		"none":    {},
 		"jsx":     {"txt": "/jsx.txt"},
 		"quiet/a": {"txt": "/quiet/a.txt"},
 		"quiet/b": {},
-		"quiet/c": {"txt": "/quiet/c.txt", "card": "/quiet/c.card.png"},
+		"quiet/c": {"txt": "/quiet/c.txt", "card": "/quiet/c.card.svg"},
 		"off/a":   {},
 	} {
 		if got := site.Page(page).data[Outputs]; !reflect.DeepEqual(got, want) {
 			t.Errorf("%s: page.outputs expected %v, got %v", page, want, got)
 		}
-		for _, name := range []string{"txt", "card.png"} {
+		for _, name := range []string{"txt", "card.svg"} {
 			file := page + "." + name
-			_, on := want[strings.TrimSuffix(name, ".png")]
+			_, on := want[strings.TrimSuffix(name, ".svg")]
 			if exists(dir, file) != on {
 				t.Errorf("%s: expected written=%v", file, on)
 			}
@@ -239,7 +239,7 @@ func TestOutputsMap(t *testing.T) {
 func TestOutputContentType(t *testing.T) {
 	dir := writeSite(t, map[string]string{
 		"_outputs/txt.jsx":      "`txt`",
-		"_outputs/card.png.jsx": "`png`",
+		"_outputs/card.png.jsx": "`<svg width=\"2\" height=\"2\"/>`",
 		"_outputs/raw.zzz.jsx":  "`?`",
 		"_outputs/json.jsx":     `data({contentType: "application/json", preamble: "// json"}); "{}"`,
 		"_outputs/htm.html.jsx": `() => <html><body><p>hi</p></body></html>`,
