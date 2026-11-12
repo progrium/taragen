@@ -1,0 +1,7 @@
+# People who may sign proposals and the spec, one per line: <login> <Full Name>
+# The name must match the signature line exactly.
+#
+# Only the person a line names may add, change, or remove it. Agents and
+# automation never edit this file. The /sign workflow reads it from main.
+progrium Jeff Lindsay
+taramk Tara Kirkland

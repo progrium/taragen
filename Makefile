@@ -25,6 +25,16 @@ build:
 		./cmd/taragen
 .PHONY: build
 
+## Run tests
+test:
+	go test ./...
+.PHONY: test
+
+## Validate design proposals
+design-check:
+	go run ./tools/design check
+.PHONY: design-check
+
 ## Build the web assets
 web-build:
 	cd web && taragen build
