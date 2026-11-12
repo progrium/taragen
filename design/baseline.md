@@ -18,7 +18,7 @@ Record taragen's design as it stood when the proposal process was adopted (commi
 ## Background
 
 taragen was built over about 60 commits without design docs. Its decisions live in the code: the single-binary JSX runtime built on esbuild and goja, filesystem conventions instead of a config file, one data map per page, nested directory layouts, and serve mode with live reload.
-The design below was written from the code as it stood, including the rough edges. The [spec](../spec.md) started from the same text and changes as proposals are implemented; this proposal keeps the starting point.
+The design below was written from the code as it stood, including the rough edges. The [spec](SPEC.md) started from the same text and changes as proposals are implemented; this proposal keeps the starting point.
 
 ## Proposal
 

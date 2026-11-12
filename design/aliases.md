@@ -22,7 +22,7 @@ Both add rows to the route table from [page-outputs](page-outputs.md), so collis
 
 ## Background
 
-Taragen has no way to redirect a URL (see Build mode and Serve mode in the [spec](../spec.md)).
+Taragen has no way to redirect a URL (see Build mode and Serve mode in the [spec](SPEC.md)).
 Every file in `_public/` comes from a page source or a static file, and `build` now cleans `_public/` first, so a page that moves leaves nothing behind at its old URL.
 
 The progrium.xyz redesign moves the blog from `/blog/<year>/<slug>` to `/articles/<year>/<slug>`, and the site is deployed to GitHub Pages, which ignores host redirect files.

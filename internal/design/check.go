@@ -357,8 +357,9 @@ func (c *checker) graph() {
 }
 
 var (
-	// literal paths into the design directory
-	designPathRe = regexp.MustCompile(regexp.QuoteMeta(DesignDir) + `/[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.md`)
+	// literal paths into the design directory, not part of a longer path
+	// such as web/design/x.md
+	designPathRe = regexp.MustCompile(`(?:^|[^A-Za-z0-9_./-])(` + regexp.QuoteMeta(DesignDir) + `/[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.md)`)
 	// relative Markdown links
 	mdLinkRe = regexp.MustCompile(`\]\(([^)\s#]+)(#[^)\s]*)?\)`)
 )
@@ -381,8 +382,8 @@ func (c *checker) files() error {
 		}
 		for i, line := range strings.Split(string(b), "\n") {
 			n := i + 1
-			for _, m := range designPathRe.FindAllString(line, -1) {
-				c.link(f, n, path.Clean(m))
+			for _, m := range designPathRe.FindAllStringSubmatch(line, -1) {
+				c.link(f, n, path.Clean(m[1]))
 			}
 			for _, m := range mdLinkRe.FindAllStringSubmatch(line, -1) {
 				target := m[1]

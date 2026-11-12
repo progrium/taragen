@@ -15,7 +15,7 @@ Nov 12, 2026 · Jeff Lindsay, h.d.a.
 
 ## Abstract
 
-Fix the rough edges the [spec](../spec.md) lists under known limitations that block real sites: `build` copies `_assets/` and clears stale output, JSX escapes text and attributes by default with `raw()` for trusted HTML, attributes keep their source order, broken partials fail the render, and a set of smaller fixes to serve mode, the walker, `data()` detection, and JS value handling.
+Fix the rough edges the [spec](SPEC.md) lists under known limitations that block real sites: `build` copies `_assets/` and clears stale output, JSX escapes text and attributes by default with `raw()` for trusted HTML, attributes keep their source order, broken partials fail the render, and a set of smaller fixes to serve mode, the walker, `data()` detection, and JS value handling.
 
 ## Background
 

@@ -1,7 +1,7 @@
 # Design process
 
 Changes to taragen's design go through proposals: one Markdown file per change in this directory, with frontmatter that `tools/design` validates and summarizes.
-The [spec](../spec.md) describes taragen as built. Proposals say what changes and why; the spec says what exists.
+The [spec](SPEC.md) describes taragen as built. Proposals say what changes and why; the spec says what exists.
 The order of work comes from the dependency graph between proposals, not from milestones.
 
 This README is how taragen applies the workflow. It was adopted by the [design-process](design-process.md) proposal, and changes to it go through proposals too.
@@ -19,12 +19,12 @@ This README is how taragen applies the workflow. It was adopted by the [design-p
 
 | File | Holds | Who edits it |
 | --- | --- | --- |
-| [`../spec.md`](../spec.md) | taragen as built: architecture, invariants, decisions | The PR that finishes a proposal |
+| [`SPEC.md`](SPEC.md) | taragen as built: architecture, invariants, decisions | The PR that finishes a proposal |
 | `README.md` (this file) | The workflow as taragen applies it | A proposal that changes the process |
 | [`TEMPLATE.md`](TEMPLATE.md) | The sections a new proposal starts from | A proposal that changes the process |
 | `<slug>.md` | One proposal: what changes, why, and how it's proven | Its authors, under the rules below |
 | [`SIGNERS`](SIGNERS) | Who may sign, as `<login> <Full Name>` per line | Only the person each line names |
-| [`../../AGENTS.md`](../../AGENTS.md) | The rules AI agents follow | A proposal that changes the process |
+| [`../AGENTS.md`](../AGENTS.md) | The rules AI agents follow | A proposal that changes the process |
 
 ## When a proposal is needed
 
@@ -45,7 +45,7 @@ A bug fix that changes documented behavior (for example, copying `_assets/` in b
 
 ## Proposals
 
-A proposal is `docs/design/<slug>.md`: frontmatter, then the sections in [TEMPLATE.md](TEMPLATE.md).
+A proposal is `design/<slug>.md`: frontmatter, then the sections in [TEMPLATE.md](TEMPLATE.md).
 
 ### Slugs
 
@@ -179,7 +179,7 @@ An issue is optional and exists only for feedback; the file is the source of tru
 
 ### What check enforces
 
-`check` fails on: unparseable frontmatter, unknown keys, missing required fields, unknown statuses, bad dates; a file not named for its slug, duplicate slugs or issue numbers, a slug starting with a digit without an issue; references by number or to unknown slugs in `depends` or `superseded-by`; links from Markdown files to files under `docs/design/` that don't exist; dependency cycles; an implemented proposal depending on an unimplemented one; an accepted proposal depending on a declined one; `proposed` without `issue`; `declined` without a Declined section; `superseded` without `superseded-by`; `implemented` without `branch: [main]`, or `main` on anything else; Done criteria items that aren't checkboxes, or open items on an implemented proposal; and signature lines in neither form or naming someone not in `SIGNERS`.
+`check` fails on: unparseable frontmatter, unknown keys, missing required fields, unknown statuses, bad dates; a file not named for its slug, duplicate slugs or issue numbers, a slug starting with a digit without an issue; references by number or to unknown slugs in `depends` or `superseded-by`; links from Markdown files to files under `design/` that don't exist; dependency cycles; an implemented proposal depending on an unimplemented one; an accepted proposal depending on a declined one; `proposed` without `issue`; `declined` without a Declined section; `superseded` without `superseded-by`; `implemented` without `branch: [main]`, or `main` on anything else; Done criteria items that aren't checkboxes, or open items on an implemented proposal; and signature lines in neither form or naming someone not in `SIGNERS`.
 
 It warns when a proposed or accepted proposal has every Done criteria item checked or waived, and when a branch in `branch` can't be found.
 

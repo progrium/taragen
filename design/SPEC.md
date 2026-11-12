@@ -3,8 +3,8 @@
 This spec describes taragen as built: its architecture, the main components, how
 a build or request flows through them, and the decisions (and known rough edges)
 baked into the current code. It describes what exists, never unbuilt features.
-Changes to it go through proposals; see [the design process](design/README.md).
-Its starting point is frozen in the [baseline](design/baseline.md) proposal.
+Changes to it go through proposals; see [the design process](README.md).
+Its starting point is frozen in the [baseline](baseline.md) proposal.
 
 ## Overview
 
@@ -50,7 +50,7 @@ Both commands operate on the current working directory as the site root.
 | `web/` | The taragen website itself, which doubles as the reference example site. |
 | `Makefile`, `.github/workflows/build.yml` | Local builds, cross-compiled dist binaries, CI via a shared reusable workflow. |
 | `tools/design/`, `internal/design/` | The design process tool: proposal parsing, `check`, computed state, and signing. |
-| `docs/spec.md`, `docs/design/` | This spec, and the design proposals that change it. |
+| `design/SPEC.md`, `design/` | This spec, and the design proposals that change it. |
 | `AGENTS.md` | Rules for AI agents working in the repository. |
 
 ## Core concepts
@@ -829,13 +829,13 @@ where noted.
 
 ## Design process tooling
 
-Design changes go through proposals in `docs/design/`, as described in the
-[design process README](design/README.md). The tooling lives in the repository
+Design changes go through proposals in `design/`, as described in the
+[design process README](README.md). The tooling lives in the repository
 and uses only Go and git:
 
 - `internal/design` parses proposal frontmatter (a strict YAML subset, with its
   own parser rather than a YAML library, so anything another parser could read
-  differently is rejected), loads `docs/design/`, `SIGNERS`, and this spec, and
+  differently is rejected), loads `design/`, `SIGNERS`, and this spec, and
   implements `Check`, the computed states (ready, in progress, stalled, read
   from branch refs), and the Mermaid dependency graph. Its rules are covered by
   a table test.

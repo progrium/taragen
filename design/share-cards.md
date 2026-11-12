@@ -31,7 +31,7 @@ The [page-outputs](page-outputs.md) proposal gives each page extra output files 
 It also leaves open whether an output may return bytes, deferring that to this proposal.
 What's missing is the rasterizer: something inside the taragen binary that turns markup and fonts into a PNG.
 
-Taragen is one Go binary with no Node or browser dependency (see Key design decisions in the [spec](../spec.md)), and `make dist` cross-compiles it for darwin, windows, and linux on amd64 and arm64, plus linux-386 in CI.
+Taragen is one Go binary with no Node or browser dependency (see Key design decisions in the [spec](SPEC.md)), and `make dist` cross-compiles it for darwin, windows, and linux on amd64 and arm64, plus linux-386 in CI.
 Any rasterizer has to fit that: no cgo, no system libraries, no external programs.
 
 ## Proposal

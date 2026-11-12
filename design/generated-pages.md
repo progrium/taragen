@@ -23,7 +23,7 @@ Generated pages are rows in the route table from [page-outputs](page-outputs.md)
 
 ## Background
 
-Every page in taragen comes from one source file, or is a bare directory with no source (see Site and file conventions and Page paths in the [spec](../spec.md)).
+Every page in taragen comes from one source file, or is a bare directory with no source (see Site and file conventions and Page paths in the [spec](SPEC.md)).
 The page set is whatever `walk` finds on disk, and `build` skips bare directories, so a directory like `logs/2026/` that holds only log entries has no page at `/logs/2026`.
 
 The progrium.xyz redesign needs pages that follow from the content rather than from files:

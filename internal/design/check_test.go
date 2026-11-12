@@ -40,7 +40,7 @@ func writeRepo(t *testing.T, files map[string]string) string {
 	return root
 }
 
-const d = "docs/design/"
+const d = "design/"
 
 func TestCheck(t *testing.T) {
 	tests := []struct {
@@ -56,8 +56,8 @@ func TestCheck(t *testing.T) {
 					"Nov 3, 2026 · Alice Example, h.d.a.\n\nSee [next](next.md).\n\n## Done criteria\n\n- [x] Works.\n  A note.\n- [~] On Plan 9. Waived: no runner.\n"),
 				d + "next.md":   prop("next", "draft", "depends: [base]\nbranch: [next]", ""),
 				d + "SIGNERS":   "# comment\nalice Alice Example\n",
-				"docs/spec.md":  "# Spec\n\nNov 3, 2026 · Alice Example\n\nSee [base](design/base.md) and docs/design/next.md.\n",
-				"testdata/x.md": "docs/design/ignored.md\n",
+				d + "SPEC.md":   "# Spec\n\nNov 3, 2026 · Alice Example\n\nSee [base](base.md) and design/next.md.\n",
+				"testdata/x.md": "design/ignored.md\n",
 			},
 			branches: []string{"next"},
 		},
@@ -68,14 +68,14 @@ func TestCheck(t *testing.T) {
 				d + "b.md": "# no frontmatter\n",
 			},
 			want: []string{
-				`error: docs/design/a.md:1: missing required key "created"`,
-				`error: docs/design/a.md:3: title: value "yes" would be read as a YAML boolean or null`,
-				`error: docs/design/a.md:4: unknown status "in-progress" (want one of draft, proposed, accepted, implemented, declined, hold, superseded)`,
-				`error: docs/design/a.md:5: authors must be a list, like [a, b]`,
-				`error: docs/design/a.md:6: depends: invalid list item "a,b" (lists are written [a, b])`,
-				`error: docs/design/a.md:7: unknown key "milestone"`,
-				`error: docs/design/a.md:8: expected "key: value", got "no separator"`,
-				`error: docs/design/b.md:1: missing frontmatter: file must start with a "---" line`,
+				`error: design/a.md:1: missing required key "created"`,
+				`error: design/a.md:3: title: value "yes" would be read as a YAML boolean or null`,
+				`error: design/a.md:4: unknown status "in-progress" (want one of draft, proposed, accepted, implemented, declined, hold, superseded)`,
+				`error: design/a.md:5: authors must be a list, like [a, b]`,
+				`error: design/a.md:6: depends: invalid list item "a,b" (lists are written [a, b])`,
+				`error: design/a.md:7: unknown key "milestone"`,
+				`error: design/a.md:8: expected "key: value", got "no separator"`,
+				`error: design/b.md:1: missing frontmatter: file must start with a "---" line`,
 			},
 		},
 		{
@@ -86,13 +86,13 @@ func TestCheck(t *testing.T) {
 				d + "9lives.md": prop("9lives", "superseded", "superseded-by: gone", ""),
 			},
 			want: []string{
-				`error: docs/design/9lives.md:2: slug "9lives" must start with a letter`,
-				`error: docs/design/9lives.md:8: superseded-by refers to unknown proposal "gone"`,
-				`error: docs/design/a-copy.md:2: file must be named a.md for slug "a"`,
-				`error: docs/design/a-copy.md:2: duplicate slug "a" (also in docs/design/a.md)`,
-				`error: docs/design/a-copy.md:8: duplicate issue 3 (also in docs/design/a.md)`,
-				`error: docs/design/a.md:8: depends refers to "12" by number; refer to proposals by slug`,
-				`error: docs/design/a.md:8: depends refers to unknown proposal "nope"`,
+				`error: design/9lives.md:2: slug "9lives" must start with a letter`,
+				`error: design/9lives.md:8: superseded-by refers to unknown proposal "gone"`,
+				`error: design/a-copy.md:2: file must be named a.md for slug "a"`,
+				`error: design/a-copy.md:2: duplicate slug "a" (also in design/a.md)`,
+				`error: design/a-copy.md:8: duplicate issue 3 (also in design/a.md)`,
+				`error: design/a.md:8: depends refers to "12" by number; refer to proposals by slug`,
+				`error: design/a.md:8: depends refers to unknown proposal "nope"`,
 			},
 		},
 		{
@@ -105,9 +105,9 @@ func TestCheck(t *testing.T) {
 				d + "e.md": prop("e", "declined", "", "## Declined\n\nNo.\n"),
 			},
 			want: []string{
-				`error: docs/design/a.md:7: dependency cycle: a -> b -> a`,
-				`error: docs/design/c.md:7: implemented proposal depends on "d", which is accepted`,
-				`error: docs/design/d.md:7: accepted proposal depends on "e", which was declined`,
+				`error: design/a.md:7: dependency cycle: a -> b -> a`,
+				`error: design/c.md:7: implemented proposal depends on "d", which is accepted`,
+				`error: design/d.md:7: accepted proposal depends on "e", which was declined`,
 			},
 		},
 		{
@@ -121,11 +121,11 @@ func TestCheck(t *testing.T) {
 			},
 			branches: []string{"main"},
 			want: []string{
-				`error: docs/design/a.md:4: proposed proposal has no issue`,
-				`error: docs/design/b.md:4: declined proposal has no "## Declined" section`,
-				`error: docs/design/c.md:4: superseded proposal has no superseded-by`,
-				`error: docs/design/e.md:8: implemented proposal must have branch: [main]`,
-				`error: docs/design/f.md:8: branch lists main, but the proposal isn't implemented`,
+				`error: design/a.md:4: proposed proposal has no issue`,
+				`error: design/b.md:4: declined proposal has no "## Declined" section`,
+				`error: design/c.md:4: superseded proposal has no superseded-by`,
+				`error: design/e.md:8: implemented proposal must have branch: [main]`,
+				`error: design/f.md:8: branch lists main, but the proposal isn't implemented`,
 			},
 		},
 		{
@@ -135,27 +135,28 @@ func TestCheck(t *testing.T) {
 				d + "b.md": prop("b", "accepted", "", "## Done criteria\n\n- [x] Done.\n"),
 			},
 			want: []string{
-				`error: docs/design/a.md:16: implemented proposal has an open Done criteria item`,
-				`error: docs/design/a.md:17: Done criteria item is not a checkbox (- [ ], - [x], or - [~])`,
-				`warning: docs/design/b.md:4: every Done criteria item is checked or waived; is it implemented?`,
+				`error: design/a.md:16: implemented proposal has an open Done criteria item`,
+				`error: design/a.md:17: Done criteria item is not a checkbox (- [ ], - [x], or - [~])`,
+				`warning: design/b.md:4: every Done criteria item is checked or waived; is it implemented?`,
 			},
 		},
 		{
 			name: "signatures, links, and branches",
 			files: map[string]string{
-				d + "a.md":     prop("a", "draft", "branch: [a, a-v2]", "November 3, 2026 · Alice Example\n\nSee [b](b.md).\n"),
-				d + "SIGNERS":  "alice Alice Example\nbroken\n",
-				"docs/spec.md": "# Spec\n\nNov 3, 2026 · Mallory Example\n",
-				"README.md":    "See docs/design/missing.md.\n",
+				d + "a.md":    prop("a", "draft", "branch: [a, a-v2]", "November 3, 2026 · Alice Example\n\nSee [b](b.md).\n"),
+				d + "SIGNERS": "alice Alice Example\nbroken\n",
+				d + "SPEC.md": "# Spec\n\nNov 3, 2026 · Mallory Example\n",
+				"README.md":   "See design/missing.md.\n",
+				"web/x.md":    "Not ours: web/design/missing.md, docs/design/missing.md.\n",
 			},
 			branches: []string{"a"},
 			want: []string{
-				`error: README.md:1: link to docs/design/missing.md, which doesn't exist`,
-				`error: docs/design/SIGNERS:2: expected "<login> <Full Name>", got "broken"`,
-				`warning: docs/design/a.md:8: branch "a-v2" not found (fetch every branch tip to check)`,
-				`error: docs/design/a.md:13: signature "November 3, 2026 · Alice Example" is not in the form "Nov 11, 2026 · Full Name, h.d.a."`,
-				`error: docs/design/a.md:15: link to docs/design/b.md, which doesn't exist`,
-				`error: docs/spec.md:3: signed by "Mallory Example", who is not in docs/design/SIGNERS`,
+				`error: README.md:1: link to design/missing.md, which doesn't exist`,
+				`error: design/SIGNERS:2: expected "<login> <Full Name>", got "broken"`,
+				`error: design/SPEC.md:3: signed by "Mallory Example", who is not in design/SIGNERS`,
+				`warning: design/a.md:8: branch "a-v2" not found (fetch every branch tip to check)`,
+				`error: design/a.md:13: signature "November 3, 2026 · Alice Example" is not in the form "Nov 11, 2026 · Full Name, h.d.a."`,
+				`error: design/a.md:15: link to design/b.md, which doesn't exist`,
 			},
 		},
 	}
