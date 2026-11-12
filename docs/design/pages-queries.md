@@ -1,12 +1,12 @@
 ---
 slug: pages-queries
 title: Recursive and filtered pages() queries
-status: draft
+status: implemented
 created: 2026-11-12
 authors: [progrium]
 depends: []
 areas: [jsx, data]
-branch: []
+branch: [main]
 ---
 
 # Proposal: Recursive and filtered pages() queries
@@ -147,16 +147,17 @@ None. `pages()` reads only the site's own page data, which any page can already 
 
 ## Done criteria
 
-- [ ] `TestPagesDoubleStar`: `articles/**` returns pages one and two levels down, including a leaf page directly under `articles`; `**` returns every page but the root; `docs/**/api` matches at any depth; `a**` behaves as `a*`.
-- [ ] `TestPagesDoubleStarGroupingNodes`: a folder with no index is left out of `**` results, and still returned by a plain-path query and in `subpages`.
-- [ ] `TestPagesSingleStarUnchanged`: `logs/*` and plain-path queries return the same pages as before this change, on the `web/` site and the test fixtures.
-- [ ] `TestPagesObjectForm`: `{ path: "x" }` equals `"x"`; `path` defaults to `**`; a list of paths returns their union once each, sorted as one listing.
-- [ ] `TestPagesWhere`: scalar match, list-element match, any-of with a list, AND across keys, missing keys, strict equality between `"2026"` and `2026`, and `where` not applied to `subpages`.
-- [ ] `TestPagesQueryErrors`: a malformed pattern, an unknown key, a non-string `path`, and an object `where` value each fail the render with an error naming the query.
-- [ ] `TestPagesOrder`: same-date pages order by slug, then path; undated pages come before dated ones; the same listing is identical across 20 builds.
-- [ ] `TestPagesDrafts`: drafts are left out of every query form in `build` and included in `serve`.
-- [ ] The `web/` site lists recent posts with `**` and has a tag page that uses `where`.
-- [ ] The spec describes `**`, the object form, query errors, and the listing order.
+- [x] `TestPagesDoubleStar`: `articles/**` returns pages one and two levels down, including a leaf page directly under `articles`; `**` returns every page but the root; `docs/**/api` matches at any depth; `a**` behaves as `a*`.
+- [x] `TestPagesDoubleStarGroupingNodes`: a folder with no index is left out of `**` results, and still returned by a plain-path query and in `subpages`.
+- [x] `TestPagesSingleStarUnchanged`: `logs/*` and plain-path queries return the same pages as before this change, on the `web/` site and the test fixtures.
+- [x] `TestPagesObjectForm`: `{ path: "x" }` equals `"x"`; `path` defaults to `**`; a list of paths returns their union once each, sorted as one listing.
+- [x] `TestPagesWhere`: scalar match, list-element match, any-of with a list, AND across keys, missing keys, strict equality between `"2026"` and `2026`, and `where` not applied to `subpages`.
+- [x] `TestPagesQueryErrors`: a malformed pattern, an unknown key, a non-string `path`, and an object `where` value each fail the render with an error naming the query.
+- [x] `TestPagesOrder`: same-date pages order by slug, then path; undated pages come before dated ones; the same listing is identical across 20 builds.
+- [x] `TestPagesDrafts`: drafts are left out of every query form in `build` and included in `serve`.
+- [x] The `web/` site lists recent posts with `**` and has a tag page that uses `where`.
+  - The blog feed (`web/_blog/feed.xml.jsx`) lists posts with `blog/**`, newest first; `_blog/` is still pruned from builds, as before. The docs have tag pages under `web/docs/tags/`, whose shared layout uses `where: { tags: page.slug }`.
+- [x] The spec describes `**`, the object form, query errors, and the listing order.
 
 ## Implementation
 
@@ -169,3 +170,7 @@ None. `pages()` reads only the site's own page data, which any page can already 
 
 - [generated-pages](generated-pages.md) would give folders like `/logs/2026` a source, so they'd appear in `logs/**`. A stream would then filter them out by path or with a `where` key such as `kind`. Should generated pages instead be left out of `**` like grouping nodes, or is that generated-pages's call?
 - Each result still carries its recursive `subpages`, so `pages("**")` copies deep trees for every page near the root. That's fine at the redesign's size; a `subpages: false` key could be added if it isn't.
+
+## Updates
+
+- 2026-11-12: Matching splits a page path into segments, and the root's path has none, so a single `*` no longer matches the root: `pages("*")` returns the pages two levels deep instead of also returning the root's subpages. The root is also no longer in its own `subpages`, so `pages(".")` doesn't list the root. Both were reported as a bug in issue 35, and fall out of the segment matching described above. `TestPagesSingleStarUnchanged` compares every other string query on the `web/` site and the fixtures against the old implementation; `TestPagesRootNotMatched` covers these two cases.

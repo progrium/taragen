@@ -1,5 +1,6 @@
 ---
 title: Implement an RSS feed
+tags: [blog, layouts]
 ---
 
 We've added a page data option called `preamble` that allows you to insert a tag at the start of the layout, to better support RSS feeds.
