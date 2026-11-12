@@ -18,6 +18,10 @@ type Site struct {
 	pages  map[string]*Page
 	routes *RouteTable
 	drafts bool
+	// redirects are the _redirects rules, and warnings what the last
+	// ParseAll found that build should report
+	redirects []*RedirectRule
+	warnings  []string
 
 	mu sync.Mutex
 }
@@ -57,6 +61,10 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 		return err
 	}
 
+	for _, w := range s.warnings {
+		fmt.Println("warning:", w)
+	}
+
 	for _, r := range s.routes.Routes() {
 		if err := s.generate(dest, r); err != nil {
 			return err
@@ -70,6 +78,10 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 func (s *Site) generate(dest string, r *Route) error {
 	if r.Draft() {
 		fmt.Println("skip draft:", r.URL)
+		return nil
+	}
+	if r.Kind == RouteRedirect && !r.isCopy() && !stubbable(r.URL) {
+		// warned about in ParseAll; only hosts that read _redirects get it
 		return nil
 	}
 	targetPath := filepath.Join(dest, filepath.FromSlash(r.File))
@@ -99,6 +111,21 @@ func (s *Site) generate(dest string, r *Route) error {
 		err = r.Page.Render(f)
 	case RouteOutput:
 		_, err = r.Output.Render(f)
+	case RouteAlias, RouteRedirect:
+		if r.isCopy() {
+			err = r.Page.Render(f)
+		} else {
+			err = writeStub(f, r.Target)
+		}
+		if err != nil {
+			return err
+		}
+		if r.isCopy() {
+			fmt.Println("copied:", r.URL, "from", r.Page.URL())
+		} else {
+			fmt.Println("redirect:", r.URL, "->", r.Target)
+		}
+		return f.Close()
 	default:
 		err = fmt.Errorf("unknown route kind: %s", r.Kind)
 	}
@@ -239,6 +266,12 @@ func (s *Site) ParseAll() error {
 
 	s.pages = make(map[string]*Page)
 	s.routes = nil
+	s.redirects, s.warnings = nil, nil
+
+	redirectsFile, rules, err := s.readRedirects()
+	if err != nil {
+		return err
+	}
 
 	var pagepaths, statics []string
 	parsed := make(map[string]bool)
@@ -279,11 +312,12 @@ func (s *Site) ParseAll() error {
 		}
 	}
 
-	routes, err := s.buildRoutes(pagepaths, statics)
+	routes, err := s.buildRoutes(pagepaths, statics, redirectsFile, rules)
 	if err != nil {
 		return err
 	}
 	s.routes = routes
+	s.redirects = rules
 	s.linkPages()
 	return nil
 }
@@ -315,12 +349,18 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	var route *Route
 	var contentType string
+	var redirect string
+	var status int
 	var err error
 	func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		route = s.routes.Lookup(r.URL.Path)
 		if route == nil {
+			// wildcard rules come after the route table and before disk
+			if rule, target := s.matchRedirect(r.URL.EscapedPath()); rule != nil {
+				redirect, status = target, rule.Status
+			}
 			return
 		}
 		switch route.Kind {
@@ -329,9 +369,27 @@ func (s *Site) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			contentType = route.Page.ContentType()
 		case RouteOutput:
 			contentType, err = route.Output.Render(&buf)
+		case RouteAlias, RouteRedirect:
+			if route.isCopy() {
+				err = route.Page.Render(&buf)
+				contentType = route.Page.ContentType()
+				return
+			}
+			redirect, status = route.Target, http.StatusMovedPermanently
+			if route.Rule != nil {
+				status = route.Rule.Status
+			}
 		}
 	}()
 
+	if redirect != "" {
+		// a rule keeps the request's query string when its target has none
+		if (route == nil || route.Rule != nil) && r.URL.RawQuery != "" && !strings.Contains(redirect, "?") {
+			redirect += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, redirect, status)
+		return
+	}
 	if route == nil {
 		http.ServeFile(w, r, path.Join(s.dir, path.Clean("/"+r.URL.Path)))
 		return

@@ -30,9 +30,11 @@ Both commands operate on the current working directory as the site root.
 | --- | --- |
 | `cmd/taragen/` | CLI entry point (`main.go`, `serve.go`, `build.go`) built on `tractor.dev/toolkit-go` engine/cli. |
 | `site.go` | `Site`: directory walking, page registry, static build, HTTP handler, partial loading. |
-| `routes.go` | `RouteTable`: every URL the site serves and the page, output, or static file that produces it. |
+| `routes.go` | `RouteTable`: every URL the site serves and the page, output, static file, alias, or redirect that produces it. |
 | `page.go` | `Page`: page data model, parsing, globals/defaults loading, layout chain, rendering. |
 | `outputs.go` | `Output`: `_outputs/` template lookup, opt-outs, `page.outputs`, and output rendering. |
+| `aliases.go` | Reading and normalizing `aliases`, and writing redirect stubs. |
+| `redirects.go` | Parsing `_redirects`, adding its route rows, and matching wildcard rules in serve. |
 | `links.go` | The link pass: collecting `links` from page bodies, normalizing hrefs, and inverting them into `backlinks`. |
 | `format.go` | Format registry (`Formats`), `PageParser` interface, YAML frontmatter splitting. |
 | `format_jsx.go` | JSX page parser and the built-in JS globals (`page`, `partial`, `pages`). |
@@ -74,6 +76,7 @@ Special files, all resolved relative to the site root:
 | `_outputs/<name>.jsx` | An output template: an extra file for every HTML page in that directory and below (see Outputs). |
 | any other `_name.jsx` / `_name.tmpl` | A partial, loaded by path via `partial("_dir/name")`. |
 | `_assets/` (root only) | Static files copied verbatim to `_public/_assets/` by `build`, never rendered. |
+| `_redirects` (root only) | Redirect rules in a subset of Netlify's format, copied to `_public/_redirects` by `build` (see Aliases and redirects). |
 
 ### Page paths
 
@@ -107,6 +110,7 @@ built-in meaning:
 | `contentType` | Defaults to `text/html`; served as the HTTP `Content-Type`. |
 | `preamble` | Text written before the output; defaults to `<!DOCTYPE html>` for HTML. |
 | `outputs` | Set by taragen to a map from output name to URL (see Outputs). A page sets it to `false`, or to a map with `false` entries, to turn outputs off. |
+| `aliases` | Old URL paths that redirect to the page, as a string or a list of strings. Rewritten by taragen to the normalized list (see Aliases and redirects). |
 | `links` | Set by taragen to the sorted URLs of the pages this page's body links to (see Links and backlinks). |
 | `backlinks` | Set by taragen to the data of the pages that link to this page, sorted like `pages()`. |
 | `siteURL` | The site's absolute origin, such as `https://example.com`; absolute links with this origin count as links to the site's own pages. Read, never written. |
@@ -126,7 +130,7 @@ Data is populated in this order, later writers winning:
 ### Drafts
 
 `Page.Draft()` is true if `draft: true` is set **or** the page's `date` is in
-the future. A draft's outputs are drafts too. `build` always skips drafts. `serve` constructs the site with
+the future. A draft's outputs and aliases are drafts too. `build` always skips drafts. `serve` constructs the site with
 `drafts=true`, so drafts are still rendered and included in `pages()` listings.
 `Subpages()` filters drafts only when the site is not in drafts mode.
 
@@ -399,6 +403,58 @@ A `text/html` output is formatted with `gohtml` like a page. A template that
 throws fails the build, or is a 500 in `serve`, with an error naming the output
 and its page.
 
+### Aliases and redirects
+
+**Aliases.** A page lists the URLs it used to live at in `aliases`. It is
+ordinary page data, so it can come from `_defaults.jsx`, frontmatter, or
+`data()`, and a page's own value replaces the defaults' whole. It is read at
+the end of `Parse`, so a value set by a layout is ignored. A single string is a
+list of one; any other type, or a non-string entry, fails the parse naming the
+page. Bare directories have no aliases.
+
+Each alias, and each `from` in `_redirects`, is normalized: it must start with
+`/`, a trailing `/` is removed (except for `/` itself), and it must not contain
+`?`, `#`, `\`, an empty segment, or a `.` or `..` segment, so nothing can be
+written outside `_public/`. Duplicates in one page's list are dropped, and
+`page.aliases` is rewritten to the normalized list, which layouts and `pages()`
+results see. A URL maps to a file like a page path: `<alias>/index.html` when
+its last segment has no extension, and as-is otherwise.
+
+**Stubs.** For an alias of an HTML page, `build` writes a fixed stub page with a
+`<meta http-equiv="refresh">` to the page's path, a canonical link, a fallback
+link, and `<meta name="robots" content="noindex">`. The target is escaped as an
+attribute and as text, as in JSX output. Stubs run no layouts, globals, or
+output templates. An alias of a non-HTML page, such as `feed.xml.jsx`, gets a
+copy of the page's output instead, so feed readers that don't follow a refresh
+keep working.
+
+**The redirects file.** The root `_redirects` file holds one rule per line,
+`from to [status]`; blank lines and lines starting with `#` are ignored.
+
+- `from` is a normalized path that may end in `/*`, a wildcard matching every
+  path below it. `*` anywhere else, and `:` placeholders, are errors.
+- `to` is a path starting with `/` (with an optional query string) or an
+  absolute `http` or `https` URL. It may contain `:splat`, replaced by what the
+  wildcard matched, only when `from` ends in `/*`. Other placeholders, `#`, and
+  `\` are errors.
+- `status` is `301`, `302`, `307`, or `308`, defaulting to `301`.
+
+Anything else (`200` rewrites, `404`s, the `!` force suffix, conditions, extra
+fields) fails `ParseAll` naming the line. `build` copies the file verbatim and
+writes stubs from it:
+
+- A rule without a wildcard writes a stub at `from` pointing to `to`, or a copy
+  of the page when `to` is a non-HTML page. When `from` has an extension other
+  than `.html` and the rule isn't a copy, no stub is written and a warning is
+  printed.
+- A wildcard rule whose `to` is a path with exactly one `:splat` is expanded
+  against the HTML pages in the route table: for `/blog/* /articles/:splat`,
+  every page under `/articles/` gets a stub at `/blog/` plus the rest of its
+  path. Paths already in the table are skipped, so an earlier rule or a real
+  page wins. Expanded rows for drafts are skipped in `build`.
+- Any other wildcard rule can't be expanded; `build` prints a warning naming
+  the line, and it only works on hosts that read `_redirects`.
+
 ### Route table
 
 `ParseAll` ends by building a `RouteTable` that maps every URL the site serves
@@ -409,17 +465,25 @@ to the one thing that produces it. Each `Route` has a kind, a URL, and the file
 | --- | --- | --- |
 | `page` | `/`, `/about`, `/feed.xml` | `index.html`, `about/index.html`, `feed.xml` |
 | `output` | `/about.txt` | `about.txt` |
-| `static` | `/img/logo.svg`, `/_assets/style.css` | the same path |
+| `static` | `/img/logo.svg`, `/_assets/style.css`, `/_redirects` | the same path |
+| `alias` | `/blog/2021/ngrok`, `/old.html` | `blog/2021/ngrok/index.html`, `old.html` |
+| `redirect` | `/newsletter`, and each path a wildcard rule expands to | `newsletter/index.html` |
 
 Pages with a source are page routes, written to `<path>/index.html` when the
 page path has no extension (and for the root), and as-is otherwise. Bare
 directories have no route. Static routes are the non-page files `walk` finds
-plus the files under the root `_assets/` directory.
+plus the files under the root `_assets/` directory, and the root `_redirects`
+file. Alias rows are added after every page and output, then a redirect row for
+each `_redirects` rule without a wildcard, then the rows wildcard rules expand
+to.
 
 Lookups ignore leading and trailing slashes, so `/about` and `/about/` are the
 same route. Two routes with the same URL or the same file fail `ParseAll`
 with an error naming both producers, such as an output `foo.txt` and a static
-file `foo.txt`, or a page `foo` and a static `foo/index.html`. Drafts stay in
+file `foo.txt`, a page `foo` and a static `foo/index.html`, an alias equal to
+a page's path or claimed by two pages, or an alias that matches a `_redirects`
+rule. Rows expanded from wildcard rules are the exception: they never collide,
+since paths already taken are skipped. Drafts stay in
 the table; `Route.Draft()` reports whether the route's page is a draft, and
 each mode applies its own draft rule. `Site.Routes()` returns the table from the
 last `ParseAll`.
@@ -485,9 +549,12 @@ pages at the end.
    except dot-prefixed entries at its top level, so a checked-out deploy
    repository (`_public/.git`) survives. Renamed and deleted pages don't linger.
 3. **Routes.** Every route is written, in order of its file: static files
-   (including `_assets/`) are copied verbatim, and pages and outputs are
-   rendered to their files. Drafts and their outputs are skipped. Each page
-   renders once.
+   (including `_assets/` and `_redirects`) are copied verbatim, pages and
+   outputs are rendered to their files, and alias and redirect rows are
+   written as stubs or copies. Drafts and their outputs and aliases are
+   skipped. Each page renders once, plus once for each copy made of it.
+   Warnings from `ParseAll`, such as wildcard rules that can't be expanded,
+   are printed first.
 
 Any render error, including a failing partial or output template, stops the
 build with a non-zero exit.
@@ -505,7 +572,15 @@ parses everything, and serves on port 8088 (hard-coded). `Site.ServeHTTP`:
   lookup and render run under the site mutex, the same one `ParseAll` takes, so
   a reload during a request can't race. A render error is a 500 with the error
   text.
-- Paths not in the table are served from disk with `http.ServeFile`. Because
+- An alias of an HTML page answers with a `301` to the page's path, and an
+  alias of a non-HTML page with a copy of the page. A redirect row answers
+  with its rule's status, or a copy when `build` would write one.
+- Paths not in the table are matched against the wildcard rules in order, on
+  the cleaned, escaped request path, so a wildcard rule redirects even where
+  `build` couldn't write stubs. Rules keep the request's query string when
+  `to` has none. Off-site targets come only from `_redirects`, and `:splat`
+  only fills in a path, so serve isn't an open redirect.
+- Paths that match nothing are served from disk with `http.ServeFile`. Because
   this bypasses `walk`, underscore paths are reachable in serve mode, and a
   bare directory gets a directory listing.
 
@@ -517,7 +592,7 @@ every open reload WebSocket, so CSS and other static edits reload the browser.
 A change to a page source (by the extensions in `Formats`, which includes
 output templates), a directory, or an extensionless name (possibly a deleted
 directory) first calls `ParseAll()` to pick up new and removed pages and
-outputs. Edits to an existing output template show on the next request, since
+outputs; `_redirects` is extensionless, so its edits reparse too. Edits to an existing output template show on the next request, since
 outputs are rendered fresh each time. The injected client script is a one-liner that
 reloads the page when its socket closes:
 
