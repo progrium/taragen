@@ -160,10 +160,16 @@ func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any,
 	out := map[string]any{}
 	before := vm.GlobalObject().Keys()
 
+	// the globals passed in are the file's environment, not its exports:
+	// only a name the file defines or reassigns is exported, so a
+	// _defaults.jsx doesn't copy page, params, partial and the site's
+	// helpers into every page's data
+	given := make(map[string]goja.Value, len(globals))
 	for key, value := range globals {
 		if err := vm.Set(key, value); err != nil {
 			return nil, err
 		}
+		given[key] = vm.Get(key)
 	}
 
 	_, err = vm.RunProgram(prg)
@@ -172,9 +178,14 @@ func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any,
 	}
 
 	for _, key := range vm.GlobalObject().Keys() {
-		if !slices.Contains(before, key) {
-			out[key] = vm.Get(key).Export()
+		if slices.Contains(before, key) {
+			continue
 		}
+		v := vm.Get(key)
+		if g, ok := given[key]; ok && v.SameAs(g) {
+			continue
+		}
+		out[key] = v.Export()
 	}
 
 	return out, nil

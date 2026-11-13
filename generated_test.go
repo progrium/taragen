@@ -68,6 +68,25 @@ func TestGeneratedTag(t *testing.T) {
 	}
 }
 
+// A _defaults.jsx exports only the names it defines, so it can't replace a
+// generated page's params with the params() builtin it was run alongside.
+func TestGeneratedWithDefaults(t *testing.T) {
+	dir := writeSite(t, withFiles(taggedPosts(), map[string]string{
+		"_defaults.jsx":  "siteURL = \"https://example.com\";\n",
+		"tags/[tag].jsx": tagTemplate,
+	}))
+	mustBuild(t, dir)
+	assertContains(t, readOut(t, dir, "tags/go/index.html"), "<li>A</li>", "<li>B</li>")
+
+	p := parsed(t, dir, false).Page("tags/web")
+	if p.data["title"] != "#web" || p.data["siteURL"] != "https://example.com" {
+		t.Errorf("tags/web: title %v, siteURL %v", p.data["title"], p.data["siteURL"])
+	}
+	if _, ok := p.data["partial"]; ok {
+		t.Error("a builtin global was copied into page data by _defaults.jsx")
+	}
+}
+
 func TestGeneratedNested(t *testing.T) {
 	dir := writeSite(t, map[string]string{
 		"logs/2026/10-30.md": "---\ndate: 2026-10-30\n---\nOct\n",
