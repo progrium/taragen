@@ -13,7 +13,9 @@ resvg = { version = "=0.50.0", default-features = false, features = ["text", "ra
 wuff = "=0.2.10"
 
 [profile.release]
-opt-level = "s"
+# Optimized for speed, not size: at "s" rasterizing a 1200x630 card took about
+# three times as long, for a module only about 0.5 MB smaller.
+opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"

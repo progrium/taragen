@@ -203,7 +203,7 @@ func renderOutputJSX(name string, src []byte, globals map[string]any, data Data)
 			}
 		}
 	}()
-	vm, jsCode, err := setupJSX(name, replacePreNewlines(src))
+	vm, prg, err := setupJSX(name, replacePreNewlines(src))
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func renderOutputJSX(name string, src []byte, globals map[string]any, data Data)
 		return nil, err
 	}
 
-	v, err := vm.RunString(jsCode)
+	v, err := vm.RunProgram(prg)
 	if err != nil {
 		return nil, err
 	}

@@ -7,25 +7,72 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/evanw/esbuild/pkg/api"
 )
 
-func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
-	transform := api.Transform(string(src), api.TransformOptions{
+// compiledJSX caches compiled JSX by name and source. Every render gets a
+// fresh VM, but a build runs the same _globals.jsx, layouts, partials, and
+// output templates for every page, so transforming and compiling each one
+// once instead of on every render saves most of the work of starting a VM.
+// A goja Program isn't tied to a runtime and can be run by many.
+var compiledJSX struct {
+	sync.Mutex
+	programs map[jsxKey]*goja.Program
+}
+
+type jsxKey struct{ name, src string }
+
+// maxCompiledJSX bounds the cache, which serve would otherwise grow with
+// every edit. Past it the cache starts over.
+const maxCompiledJSX = 1024
+
+// compileJSX transforms JSX source to JS and compiles it, or returns the
+// program from an earlier call with the same name and source.
+func compileJSX(name string, src []byte) (*goja.Program, error) {
+	key := jsxKey{name, string(src)}
+	compiledJSX.Lock()
+	prg, ok := compiledJSX.programs[key]
+	compiledJSX.Unlock()
+	if ok {
+		return prg, nil
+	}
+
+	transform := api.Transform(key.src, api.TransformOptions{
 		Loader:         api.LoaderJSX,
 		JSXFactory:     "hyper",
 		JSXFragment:    "'<>'",
 		JSXSideEffects: true,
 	})
 	if len(transform.Errors) > 0 {
-		return nil, "", fmt.Errorf("error parsing JSX: %s (%s:%d)", transform.Errors[0].Text, name, transform.Errors[0].Location.Line)
+		return nil, fmt.Errorf("error parsing JSX: %s (%s:%d)", transform.Errors[0].Text, name, transform.Errors[0].Location.Line)
+	}
+	// compiled without a name, as RunString does, so errors read the same
+	prg, err := goja.Compile("", string(transform.Code), false)
+	if err != nil {
+		return nil, err
+	}
+
+	compiledJSX.Lock()
+	if compiledJSX.programs == nil || len(compiledJSX.programs) >= maxCompiledJSX {
+		compiledJSX.programs = make(map[jsxKey]*goja.Program)
+	}
+	compiledJSX.programs[key] = prg
+	compiledJSX.Unlock()
+	return prg, nil
+}
+
+func setupJSX(name string, src []byte) (*goja.Runtime, *goja.Program, error) {
+	prg, err := compileJSX(name, src)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	vm := goja.New()
 	if err := vm.Set("hyper", hyperFunc(vm)); err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	if err := vm.Set("raw", func(v goja.Value) hyperNode {
 		if goja.IsUndefined(v) || goja.IsNull(v) {
@@ -33,10 +80,10 @@ func setupJSX(name string, src []byte) (*goja.Runtime, string, error) {
 		}
 		return rawNode(v.String())
 	}); err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
-	return vm, string(transform.Code), nil
+	return vm, prg, nil
 }
 
 func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]byte, error) {
@@ -46,7 +93,7 @@ func RenderJSX(name string, src []byte, globals map[string]any, args ...any) ([]
 // renderJSX is RenderJSX with onData, if set, called after each data() call
 // with the values it merged into the page.
 func renderJSX(name string, src []byte, globals map[string]any, onData func(map[string]any), args ...any) ([]byte, error) {
-	vm, jsCode, err := setupJSX(name, replacePreNewlines(src))
+	vm, prg, err := setupJSX(name, replacePreNewlines(src))
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +123,7 @@ func renderJSX(name string, src []byte, globals map[string]any, onData func(map[
 		}
 	}
 
-	v, err := vm.RunString(jsCode)
+	v, err := vm.RunProgram(prg)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +152,7 @@ func renderJSX(name string, src []byte, globals map[string]any, onData func(map[
 }
 
 func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any, error) {
-	vm, jsCode, err := setupJSX(name, src)
+	vm, prg, err := setupJSX(name, src)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +166,7 @@ func ExportJSX(name string, src []byte, globals map[string]any) (map[string]any,
 		}
 	}
 
-	_, err = vm.RunString(jsCode)
+	_, err = vm.RunProgram(prg)
 	if err != nil {
 		return nil, err
 	}

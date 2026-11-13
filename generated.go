@@ -151,7 +151,7 @@ func (s *Site) paramSets(t *pageTemplate) (sets []map[string]string, err error) 
 	if err := probe.loadGlobals(); err != nil {
 		return nil, err
 	}
-	vm, code, err := setupJSX(t.file, stmt)
+	vm, prg, err := setupJSX(t.file, stmt)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (s *Site) paramSets(t *pageTemplate) (sets []map[string]string, err error) 
 	}); err != nil {
 		return nil, err
 	}
-	if _, err := vm.RunString(code); err != nil {
+	if _, err := vm.RunProgram(prg); err != nil {
 		return nil, err
 	}
 	if fn, ok := goja.AssertFunction(arg); ok {
