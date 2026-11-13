@@ -2,6 +2,7 @@ package taragen
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -255,6 +256,41 @@ func TestWrapJSXScanning(t *testing.T) {
 	} {
 		if _, err := wrapJSX([]byte(input)); err == nil {
 			t.Errorf("%q: expected an error", input)
+		}
+	}
+}
+
+func TestCompileJSXCache(t *testing.T) {
+	src := []byte(`<p>hi</p>`)
+	a, err := compileJSX("a.jsx", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := compileJSX("a.jsx", src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Error("the same name and source compiled twice")
+	}
+	c, err := compileJSX("a.jsx", []byte(`<p>bye</p>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c == a {
+		t.Error("changed source returned the cached program")
+	}
+	if _, err := compileJSX("bad.jsx", []byte(`<p>`)); err == nil || !strings.Contains(err.Error(), "bad.jsx") {
+		t.Errorf("want a parse error naming the file, got %v", err)
+	}
+	// a cached program runs in a fresh VM each time, sharing no state
+	for i := 0; i < 2; i++ {
+		out, err := RenderJSX("count.jsx", []byte("var n = (typeof n === 'undefined' ? 0 : n) + 1;\n<p>{n}</p>"), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(out) != "<p>1</p>" {
+			t.Errorf("render %d: got %s", i, out)
 		}
 	}
 }

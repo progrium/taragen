@@ -155,31 +155,54 @@ func (o *Output) defaultContentType() string {
 // Render re-parses the output's page and renders the output to w. It
 // returns the output's content type.
 func (o *Output) Render(w io.Writer) (contentType string, err error) {
-	p := o.Page
-	if err = p.Parse(); err != nil {
-		return "", err
-	}
-	src, err := os.ReadFile(filepath.Join(p.site.dir, o.Template))
+	out, data, contentType, err := o.renderSource()
 	if err != nil {
 		return "", err
 	}
-	data := Data{}
-	out, err := renderOutputJSX(o.Template, src, p.globals, data)
-	if err != nil {
-		return "", fmt.Errorf("output %s of %s: %w", o.Name, p.URL(), err)
-	}
-	contentType = getData(data, ContentType, o.defaultContentType())
 	if isPNG(contentType) {
-		png, err := p.site.rasterize(out, data)
+		png, err := o.rasterize(out, data)
 		if err != nil {
-			return "", fmt.Errorf("output %s of %s: %w", o.Name, p.URL(), err)
+			return "", err
 		}
 		_, err = w.Write(png)
 		return contentType, err
 	}
+	return contentType, o.writeText(w, out, data, contentType)
+}
+
+// renderSource runs the output's template for its page, returning what it
+// rendered, the output's data, and its content type.
+func (o *Output) renderSource() (out []byte, data Data, contentType string, err error) {
+	p := o.Page
+	if err = p.Parse(); err != nil {
+		return nil, nil, "", err
+	}
+	src, err := os.ReadFile(filepath.Join(p.site.dir, o.Template))
+	if err != nil {
+		return nil, nil, "", err
+	}
+	data = Data{}
+	out, err = renderOutputJSX(o.Template, src, p.globals, data)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("output %s of %s: %w", o.Name, p.URL(), err)
+	}
+	return out, data, getData(data, ContentType, o.defaultContentType()), nil
+}
+
+// rasterize turns a raster output's rendered SVG into PNG bytes. It reads
+// nothing from the page, so it can run off the build's main goroutine.
+func (o *Output) rasterize(svg []byte, data Data) ([]byte, error) {
+	png, err := o.Page.site.rasterize(svg, data)
+	if err != nil {
+		return nil, fmt.Errorf("output %s of %s: %w", o.Name, o.Page.URL(), err)
+	}
+	return png, nil
+}
+
+func (o *Output) writeText(w io.Writer, out []byte, data Data, contentType string) (err error) {
 	if preamble := getData(data, Preamble, ""); preamble != "" {
 		if _, err = io.WriteString(w, preamble+"\n"); err != nil {
-			return "", err
+			return err
 		}
 	}
 	if isHTML(contentType) {
@@ -187,7 +210,7 @@ func (o *Output) Render(w io.Writer) (contentType string, err error) {
 		out = gohtml.FormatBytes(out)
 	}
 	_, err = w.Write(out)
-	return contentType, err
+	return err
 }
 
 // renderOutputJSX runs an output template in a fresh VM with the page's
@@ -203,7 +226,7 @@ func renderOutputJSX(name string, src []byte, globals map[string]any, data Data)
 			}
 		}
 	}()
-	vm, jsCode, err := setupJSX(name, replacePreNewlines(src))
+	vm, prg, err := setupJSX(name, replacePreNewlines(src))
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +246,7 @@ func renderOutputJSX(name string, src []byte, globals map[string]any, data Data)
 		return nil, err
 	}
 
-	v, err := vm.RunString(jsCode)
+	v, err := vm.RunProgram(prg)
 	if err != nil {
 		return nil, err
 	}
