@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 )
@@ -68,17 +69,56 @@ func (s *Site) GenerateAll(dest string, clobber bool) (err error) {
 		fmt.Println("warning:", w)
 	}
 
+	// Rasterizing a card is pure work on bytes, so it runs on a pool while
+	// the next routes render. Everything that touches pages stays here.
+	pool := newRasterPool(runtime.GOMAXPROCS(0))
 	for _, r := range s.routes.Routes() {
-		if err := s.generate(dest, r); err != nil {
+		if err := s.generate(dest, r, pool); err != nil {
+			pool.wait()
 			return err
 		}
 	}
-	return nil
+	return pool.wait()
+}
+
+// rasterPool runs raster jobs on a fixed number of goroutines and keeps the
+// first error.
+type rasterPool struct {
+	jobs chan func() error
+	wg   sync.WaitGroup
+	mu   sync.Mutex
+	err  error
+}
+
+func newRasterPool(n int) *rasterPool {
+	p := &rasterPool{jobs: make(chan func() error)}
+	for i := 0; i < n; i++ {
+		p.wg.Add(1)
+		go func() {
+			defer p.wg.Done()
+			for job := range p.jobs {
+				if err := job(); err != nil {
+					p.mu.Lock()
+					if p.err == nil {
+						p.err = err
+					}
+					p.mu.Unlock()
+				}
+			}
+		}()
+	}
+	return p
+}
+
+func (p *rasterPool) wait() error {
+	close(p.jobs)
+	p.wg.Wait()
+	return p.err
 }
 
 // generate writes one route to dest: it copies a static file, or renders a
 // page or output, skipping drafts.
-func (s *Site) generate(dest string, r *Route) error {
+func (s *Site) generate(dest string, r *Route, pool *rasterPool) error {
 	if r.Draft() {
 		fmt.Println("skip draft:", r.URL)
 		return nil
@@ -102,6 +142,37 @@ func (s *Site) generate(dest string, r *Route) error {
 		}
 		fmt.Println("copied:", r.URL)
 		return nil
+	}
+
+	if r.Kind == RouteOutput {
+		out, data, contentType, err := r.Output.renderSource()
+		if err != nil {
+			return err
+		}
+		if isPNG(contentType) {
+			pool.jobs <- func() error {
+				png, err := r.Output.rasterize(out, data)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(targetPath, png, 0644); err != nil {
+					return err
+				}
+				fmt.Println("rendered:", r.File)
+				return nil
+			}
+			return nil
+		}
+		f, err := os.Create(targetPath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := r.Output.writeText(f, out, data, contentType); err != nil {
+			return err
+		}
+		fmt.Println("rendered:", r.File)
+		return f.Close()
 	}
 
 	f, err := os.Create(targetPath)

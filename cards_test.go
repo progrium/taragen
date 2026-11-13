@@ -3,6 +3,7 @@ package taragen
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -346,5 +347,51 @@ func TestCardNoEngine(t *testing.T) {
 	cmd.Env = append(os.Environ(), "TARAGEN_TEST_NO_ENGINE=1")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+// Build rasterizes cards on several goroutines. Each card must come out as
+// it does when rendered on its own, as serve does.
+func TestCardsParallel(t *testing.T) {
+	files := map[string]string{
+		"_assets/Silkscreen-Regular.ttf": testFont(t, "ttf/Silkscreen-Regular.ttf"),
+		"_outputs/card.png.jsx":          cardTemplate,
+		"index.jsx":                      `<p/>`,
+	}
+	const n = 12
+	for i := 0; i < n; i++ {
+		files[fmt.Sprintf("p%d.md", i)] = fmt.Sprintf("---\ntitle: page %d\n---\nhi", i)
+	}
+	dir := writeSite(t, files)
+	mustBuild(t, dir)
+
+	s := parsed(t, dir, false)
+	for i := 0; i < n; i++ {
+		name := fmt.Sprintf("p%d.card.png", i)
+		r := s.Routes().Lookup("/" + name)
+		if r == nil || r.Output == nil {
+			t.Fatalf("no route for %s", name)
+		}
+		var want bytes.Buffer
+		if _, err := r.Output.Render(&want); err != nil {
+			t.Fatal(err)
+		}
+		if got := readOut(t, dir, name); got != want.String() {
+			t.Errorf("%s differs from rendering it alone", name)
+		}
+	}
+}
+
+// A card that fails to rasterize fails the build, even though it runs off
+// the main goroutine.
+func TestCardsParallelError(t *testing.T) {
+	dir := writeSite(t, map[string]string{
+		"_assets/Silkscreen-Regular.ttf": testFont(t, "ttf/Silkscreen-Regular.ttf"),
+		"_outputs/card.png.jsx":          "data({ scale: 9 });\n" + cardTemplate,
+		"index.jsx":                      `<p/>`,
+	})
+	err := buildQuiet(t, dir)
+	if err == nil || !strings.Contains(err.Error(), "scale") {
+		t.Errorf("want a scale error, got %v", err)
 	}
 }
