@@ -1,13 +1,5 @@
 data({
-    title: "Tutorials",
+  title: "Tutorials",
+  dek: "Common tasks from start to finish. Each one links back to the manual chapters it uses.",
 });
-
-<div>
-    <ul>
-    {pages("docs/tutorials").map(page => (
-        <li>
-        <a href={page.path}>{page.title}</a>
-        </li>
-    ))}
-    </ul>
-</div>
+<ol class="tl">{pages("docs/tutorials").filter(p => !p.isDir).sort(byOrder).map(p => <li><span class="m">{pad2(p.num)}</span><a href={p.path}>{p.title}</a></li>)}</ol>

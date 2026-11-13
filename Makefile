@@ -47,6 +47,11 @@ resvg:
 	cp $(RESVG_WASM) internal/raster/resvg.wasm
 .PHONY: resvg
 
+## Regenerate the website's docs pages from MANUAL.md
+web-docs:
+	go run ./tools/docs
+.PHONY: web-docs
+
 ## Build the web assets
 web-build:
 	cd web && taragen build

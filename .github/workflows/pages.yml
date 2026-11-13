@@ -1,0 +1,44 @@
+name: Website
+on:
+  push:
+    branches: [main]
+    paths: ["web/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      # Build taragen from this commit, then build the site with it.
+      - run: go build -o "$RUNNER_TEMP/taragen" ./cmd/taragen
+      - run: '"$RUNNER_TEMP/taragen" build'
+        working-directory: web
+      - id: pages
+        uses: actions/configure-pages@v5
+      # The site links from the domain root; GitHub Pages serves it under
+      # /<repo>/, so prefix its URLs with that base path.
+      - run: tools/rebase-site.sh "${{ steps.pages.outputs.base_path }}" web/_public
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/_public
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
