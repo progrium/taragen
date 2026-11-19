@@ -44,3 +44,20 @@ func TestMarkdownHighlightEscapes(t *testing.T) {
 		t.Errorf("token text is not escaped:\n%s", out)
 	}
 }
+
+func TestMarkdownGFM(t *testing.T) {
+	src := "| Name | Count |\n| :--- | ----: |\n| a | 1 |\n\n" +
+		"~~gone~~\n\n" +
+		"- [x] done\n- [ ] todo\n\n" +
+		"see https://example.com\n"
+	out := renderMarkdown(t, src)
+	assertContains(t, out,
+		"<table>",
+		`<th style="text-align:left">Name</th>`,
+		`<td style="text-align:right">1</td>`,
+		"<del>gone</del>",
+		`<input checked="" disabled="" type="checkbox">`,
+		`<input disabled="" type="checkbox">`,
+		`<a href="https://example.com">https://example.com</a>`,
+	)
+}
