@@ -1,7 +1,7 @@
 # taragen!
 
 NAME		?= taragen
-VERSION 	?= v0.1-$(shell git rev-parse --short HEAD)
+VERSION 	?= v0.2-$(shell git rev-parse --short HEAD)
 GOARGS		?=
 GOOS		?= $(shell go env GOOS)
 GOARCH		?= $(shell go env GOARCH)
@@ -62,13 +62,18 @@ web-serve:
 	cd web && taragen serve
 .PHONY: web-serve
 
-DIST_TARGETS	:= $(foreach os, $(DIST_OS), $(foreach arch, $(DIST_ARCH), $(DIST_DIR)/taragen_$(VERSION)_$(os)_$(arch)))
-$(DIST_TARGETS): $(DIST_DIR)/%:
-	GOOS=$(word 3, $(subst _, ,$@)) \
-	GOARCH=$(word 4, $(subst _, ,$@)) \
-	go build -ldflags="-X main.Version=$(VERSION)" $(GOARGS) -o $@ ./cmd/taragen	
+DIST_TARGETS	:= $(foreach os, $(DIST_OS), $(foreach arch, $(DIST_ARCH), $(DIST_DIR)/taragen_$(VERSION)_$(os)_$(arch).zip))
+dist_goos	= $(word 3, $(subst _, ,$*))
+dist_goarch	= $(word 4, $(subst _, ,$*))
+dist_exe	= $(NAME)$(if $(filter windows,$(dist_goos)),.exe)
+$(DIST_TARGETS): $(DIST_DIR)/%.zip:
+	rm -rf "$(DIST_DIR)/$*" "$@"
+	GOOS=$(dist_goos) GOARCH=$(dist_goarch) \
+	go build -ldflags="-X main.Version=$(VERSION)" $(GOARGS) -o "$(DIST_DIR)/$*/$(dist_exe)" ./cmd/taragen
+	cd "$(DIST_DIR)/$*" && zip -q "../$*.zip" "$(dist_exe)"
+	rm -rf "$(DIST_DIR)/$*"
 
-## Build distribution binaries
+## Build distribution zips
 dist: $(DIST_TARGETS)
 .PHONY: dist
 
