@@ -569,6 +569,9 @@ indentation. Other content types are written exactly as rendered.
 Markdown pages start with optional YAML frontmatter between `---` lines, then
 Markdown content. Raw HTML in Markdown is allowed and passed through.
 
+Markdown follows GitHub Flavored Markdown: tables, ~~strikethrough~~, task
+lists (`- [x] done`), and bare URLs that become links all work.
+
 Markdown is first run through the Go template engine, so `[[ ... ]]` actions
 work in Markdown:
 

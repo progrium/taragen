@@ -8,6 +8,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/formatters/html"
 	"github.com/yuin/goldmark"
 	highlighting "github.com/yuin/goldmark-highlighting"
+	"github.com/yuin/goldmark/extension"
 	gmhtml "github.com/yuin/goldmark/renderer/html"
 )
 
@@ -49,7 +50,7 @@ func (f *MarkdownParser) Parse(p *Page) ([]byte, Data, error) {
 	}
 
 	md := goldmark.New(
-		goldmark.WithExtensions(highlighter),
+		goldmark.WithExtensions(extension.GFM, highlighter),
 		goldmark.WithRendererOptions(
 			gmhtml.WithUnsafe(),
 		),
