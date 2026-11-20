@@ -62,20 +62,27 @@ web-serve:
 	cd web && taragen serve
 .PHONY: web-serve
 
-DIST_TARGETS	:= $(foreach os, $(DIST_OS), $(foreach arch, $(DIST_ARCH), $(DIST_DIR)/taragen_$(VERSION)_$(os)_$(arch).zip))
-dist_goos	= $(word 3, $(subst _, ,$*))
-dist_goarch	= $(word 4, $(subst _, ,$*))
-dist_exe	= $(NAME)$(if $(filter windows,$(dist_goos)),.exe)
-$(DIST_TARGETS): $(DIST_DIR)/%.zip:
-	rm -rf "$(DIST_DIR)/$*" "$@"
-	GOOS=$(dist_goos) GOARCH=$(dist_goarch) \
-	go build -ldflags="-X main.Version=$(VERSION)" $(GOARGS) -o "$(DIST_DIR)/$*/$(dist_exe)" ./cmd/taragen
-	cd "$(DIST_DIR)/$*" && zip -q "../$*.zip" "$(dist_exe)"
-	rm -rf "$(DIST_DIR)/$*"
+DIST_TARGETS	:= $(foreach os, $(DIST_OS), $(foreach arch, $(DIST_ARCH), $(DIST_DIR)/taragen_$(VERSION)_$(os)_$(arch)))
+$(DIST_TARGETS): $(DIST_DIR)/%:
+	GOOS=$(word 3, $(subst _, ,$@)) \
+	GOARCH=$(word 4, $(subst _, ,$@)) \
+	go build -ldflags="-X main.Version=$(VERSION)" $(GOARGS) -o $@ ./cmd/taragen
 
-## Build distribution zips
+## Build distribution binaries (CI expects bare binaries here)
 dist: $(DIST_TARGETS)
 .PHONY: dist
+
+dist_exe	= $(NAME)$(if $(findstring _windows_,$*),.exe)
+$(addsuffix .zip, $(DIST_TARGETS)): $(DIST_DIR)/%.zip: $(DIST_DIR)/%
+	rm -rf "$(DIST_DIR)/$*.d" "$@"
+	mkdir -p "$(DIST_DIR)/$*.d"
+	cp "$<" "$(DIST_DIR)/$*.d/$(dist_exe)"
+	cd "$(DIST_DIR)/$*.d" && zip -q "../$*.zip" "$(dist_exe)"
+	rm -rf "$(DIST_DIR)/$*.d"
+
+## Build distribution zips for a release
+dist-zip: $(addsuffix .zip, $(DIST_TARGETS))
+.PHONY: dist-zip
 
 .DEFAULT_GOAL := show-help
 
